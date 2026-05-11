@@ -18,11 +18,21 @@ namespace GamepadCompanion.Input;
 // se reescriben mientras el botón está apretado), InWorldMouseState es
 // persistente: lo escribe OnMouseDownRaw/OnMouseUpRaw del engine en press y
 // release. Por eso usamos edge-trigger: writing true on press, false on release.
+//
+// Trackeamos wroteLeft/wroteRight para poder soltar los flags si perdemos el
+// "permiso" de inyectar in-world (GuiDialog modal se abre mid-press, radial,
+// teclado virtual, foco perdido). Si no, ej. LT abre un cofre → MouseGrabbed
+// pasa a false pero el engine sigue leyendo InWorldMouseState vía
+// mouseWorldInteractAnyway, y como SystemMouseInWorldInteractions polea el
+// estado continuamente (no edge-triggered), re-disparaba OnBlockInteractStart
+// cada BuildRepeatDelay (~0.25s) → el cofre toggleaba open/close en loop.
 public sealed class TriggerMapper
 {
     private const float Threshold = 0.5f;
 
     private readonly ICoreClientAPI capi;
+    private bool wroteLeft;
+    private bool wroteRight;
 
     public TriggerMapper(ICoreClientAPI capi)
     {
@@ -31,21 +41,50 @@ public sealed class TriggerMapper
 
     public void Apply(GamepadState current, GamepadState previous)
     {
-        // Solo en gameplay. Si hay un GuiDialog abierto el cursor no está
-        // grabbed y meter clicks in-world arruinaría la UX (rompería bloques
-        // detrás del inventario). M9 manejará el caso de cursor virtual en GUI.
-        if (!capi.Input.MouseGrabbed) return;
         if (capi.World is not ClientMain client) return;
-
         var mouse = client.InWorldMouseState;
         if (mouse is null) return;
 
+        // Sin grab no inyectamos clicks in-world (rompería bloques detrás del
+        // inventario). Soltamos cualquier flag pegado del press anterior.
+        if (!capi.Input.MouseGrabbed)
+        {
+            ReleaseInto(mouse);
+            return;
+        }
+
         bool rtNow  = current.RightTrigger  > Threshold;
         bool rtPrev = previous.RightTrigger > Threshold;
-        if (rtNow != rtPrev) mouse.Left = rtNow;
+        if (rtNow != rtPrev)
+        {
+            mouse.Left = rtNow;
+            wroteLeft = rtNow;
+        }
 
         bool ltNow  = current.LeftTrigger  > Threshold;
         bool ltPrev = previous.LeftTrigger > Threshold;
-        if (ltNow != ltPrev) mouse.Right = ltNow;
+        if (ltNow != ltPrev)
+        {
+            mouse.Right = ltNow;
+            wroteRight = ltNow;
+        }
+    }
+
+    // Para que el driver lo llame en branches donde Apply se saltea (radial,
+    // teclado virtual, modo cursor virtual). Esas dialogs son HUD-type y no
+    // ungrabean el mouse, así que el chequeo interno de MouseGrabbed en Apply
+    // no las cubriría — necesitamos un release explícito.
+    public void Release()
+    {
+        if (capi.World is not ClientMain client) return;
+        var mouse = client.InWorldMouseState;
+        if (mouse is null) return;
+        ReleaseInto(mouse);
+    }
+
+    private void ReleaseInto(MouseButtonState mouse)
+    {
+        if (wroteLeft)  { mouse.Left  = false; wroteLeft  = false; }
+        if (wroteRight) { mouse.Right = false; wroteRight = false; }
     }
 }

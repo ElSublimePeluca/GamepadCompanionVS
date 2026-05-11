@@ -62,6 +62,7 @@ public sealed class GamepadInputDriver
 
         if (radial.IsActive)
         {
+            triggers.Release();
             cursor.Hide();
             return;
         }
@@ -72,6 +73,7 @@ public sealed class GamepadInputDriver
         // pise el input.
         if (virtualKeyboard is not null && virtualKeyboard.IsOpened())
         {
+            triggers.Release();
             cursor.Hide();
             virtualKeyboard.OnGamepadTick(current, previous);
             return;
@@ -86,6 +88,11 @@ public sealed class GamepadInputDriver
         bool smoothMode   = current.IsDown(GamepadButton.RightBumper);
         if (cursorActive)
         {
+            // Si abrimos la dialog con LT mid-press (ej. cofre), el
+            // press de LT había escrito InWorldMouseState.Right=true.
+            // Hay que soltarlo o el engine re-dispara la interacción
+            // y el cofre toggleaba open/close en loop.
+            triggers.Release();
             int fw = capi.Render.FrameWidth;
             int fh = capi.Render.FrameHeight;
             cursor.Show(fw, fh);
