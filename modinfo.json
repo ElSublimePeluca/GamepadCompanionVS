@@ -1,0 +1,14 @@
+{
+    "$schema": "https://moddbcdn.vintagestory.at/schema/modinfo.latest.json",
+    "type": "Code",
+    "modid": "gamepadcompanion",
+    "name": "GamepadCompanion",
+    "authors": [
+        "ElSublimePeluca"
+    ],
+    "description": "Native gamepad support for Vintage Story: configurable radial menu, button remapping, toggleable modifier keys, virtual cursor for GUI navigation. UI in Spanish.",
+    "version": "0.1.0",
+    "dependencies": {
+        "game": "1.22.0"
+    }
+}

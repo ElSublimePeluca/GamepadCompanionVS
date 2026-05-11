@@ -1,0 +1,14 @@
+bin/
+obj/
+.idea/
+.vs/
+.claude/
+*.user
+*.suo
+.DS_Store
+
+# Internal development planning doc — not part of the release
+PLAN.md
+
+# Release artifacts (uploaded to GitHub Releases, not tracked)
+*.zip
