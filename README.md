@@ -37,18 +37,25 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 
 ### Controllers
 
-El mod bypassea la "gamepad mapping" de GLFW (la SDL DB) y lee el joystick raw asumiendo **layout xpad** (estándar para Xbox-like controllers en Linux).
+El mod bypassea la "gamepad mapping" de GLFW (la SDL DB) y lee el joystick raw, detectando automáticamente uno de tres layouts en el primer poll:
+
+- **Xpad** (default): XInput / Xbox controllers en Linux y Windows. Axes en orden LX,LY,LT,RX,RY,RT; botones A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3.
+- **DS4-DirectInput**: PS4 y compatibles en Windows (DirectInput). Firma: triggers signed en axes 3/4 (reposo = -1). Axes en orden LX,LY,RX,LT,RT,RY; face buttons Square,Cross,Circle,Triangle.
+- **GameSir-PS4**: GameSir Cyclone 2 (y probablemente otros del mismo fabricante) en modo PS4. Detectado por nombre del dispositivo ("Chicken Run" o "GameSir"). Axes en orden xpad estándar pero con triggers signed; face buttons X y Y intercambiados en raw 2/3.
+
+En los layouts PS4 el mod ignora los raw buttons 6/7 (L2/R2 como botón digital) para evitar acciones fantasma cuando se aprietan los triggers analógicos.
 
 | Controller | Estado |
 |------------|--------|
-| GameSir Cyclone 2 | ✅ Probado a fondo |
-| Xbox 360 / One / Series | ✅ Layout xpad estándar — debería funcionar |
-| Genéricos compatibles xpad | ✅ Mismo caso |
-| DualShock 4 / DualSense | ⚠️ Funciona vía xpad mapping (Steam Input, DS4Drv, etc.) |
-| Switch Pro Controller | ⚠️ Depende del modo (algunos modos no-xpad fallan) |
-| Joysticks vintage / no-xpad | ❌ Layout distinto, mapeos van a salir mal |
+| GameSir Cyclone 2 (modo Xbox) | ✅ Probado a fondo (Linux) |
+| GameSir Cyclone 2 (modo PS4)  | ✅ Probado (Linux) |
+| Xbox 360 / One / Series | ✅ Layout xpad — debería funcionar |
+| PS4-like genérico DirectInput (Wired Controller, etc.) | ✅ Detectado por firma de triggers signed |
+| DualShock 4 / DualSense oficiales | ⚠️ Depende del driver — algunos firmwares caen en una de las heurísticas, otros no |
+| Switch Pro Controller | ⚠️ Depende del modo |
+| Joysticks vintage / no-xpad / no-PS4 | ❌ Layout desconocido, mapeos van a salir mal |
 
-Si tu controller no funciona, podés diagnosticar con el comando `/gpaxes` que dumpea los axes raw — te ayuda a saber si el dispositivo lo ve GLFW.
+Si tu controller no funciona, podés diagnosticar con `/gpaxes` (dump raw de los axes). El log del cliente también imprime el layout detectado al conectar (`detected ... layout`).
 
 ### Steam Input
 

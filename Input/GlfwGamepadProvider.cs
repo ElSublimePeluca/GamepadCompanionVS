@@ -6,9 +6,31 @@ namespace GamepadCompanion.Input;
 
 // Lee el joystick directamente vía GLFW joystick raw API — sin pasar por
 // el sistema de "gamepad mapping" de GLFW (que rechazó el mapping del Cyclone 2
-// silenciosamente, sin forma de diagnosticar). Esto asume layout xpad estándar
-// de Linux: botones 0..10 en orden A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3,
+// silenciosamente, sin forma de diagnosticar). Asume por default layout xpad:
+// botones 0..10 en orden A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3,
 // axes 0..5 en orden LX,LY,LT,RX,RY,RT, dpad como axes 6/7 o como hat 0.
+//
+// Detecta tres layouts distintos vía firma:
+//   Xpad        — XInput / xpad estándar. Default fallback.
+//                 axes: LX,LY,LT,RX,RY,RT (0..5)
+//                 buttons: A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3 (0..10)
+//   Ds4Amazon   — PS4-DInput "estándar Sony", visto en el control
+//                 "Wired Controller" (Amazon B0CZ3WKF58). Firma: a3 o a4 ≈ -1
+//                 al primer poll (triggers signed en posiciones 3/4 — los
+//                 sticks no llegan a -1 en reposo, así que es exclusivo).
+//                 axes: LX,LY,RX,LT,RT,RY (0..5)
+//                 face buttons: Square,Cross,Circle,Triangle (raw 0..3)
+//   GameSirPs4  — GameSir Cyclone 2 en modo PS4 (probablemente otros del
+//                 mismo fabricante). Firma: nombre contiene "Chicken Run"
+//                 (manufacturer Guangzhou Chicken Run Network Technology
+//                 = casa matriz de GameSir) o "GameSir". No se puede
+//                 detectar por axes solos porque comparte la firma de
+//                 triggers signed a2/a5 con xpad clásico.
+//                 axes: LX,LY,LT,RX,RY,RT (0..5) — igual a xpad
+//                 face buttons: raw 0=A, 1=B, 2=Y, 3=X (X/Y swapped
+//                 contra xpad en raw 2/3; A y B sí siguen xpad)
+// Los layouts PS4 ignoran raw 6 y 7 (L2btn/R2btn) para evitar que apretar
+// los triggers dispare también ghost-button actions.
 public sealed class GlfwGamepadProvider : IGamepadProvider
 {
     private const int MaxJoysticks = 16;
@@ -16,12 +38,25 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private const int MinExpectedButtons = 11;
     private const int MinExpectedAxes = 6;
     private const float DpadThreshold = 0.5f;
+    private const float Ds4LayoutThreshold = -0.9f;
+
+    private enum AxisLayout { Unknown, Xpad, Ds4Amazon, GameSirPs4 }
+
+    // bit-index (orden GamepadButton) → raw button index. 11 entradas:
+    // A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3.
+    private static readonly int[] Ds4AmazonButtonMap = {
+        1,  2,  0,  3,  4,  5,  8,  9, 10, 11, 12,
+    };
+    private static readonly int[] GameSirPs4ButtonMap = {
+        0,  1,  3,  2,  4,  5,  8,  9, 10, 11, 12,
+    };
 
     private readonly ILogger logger;
     private readonly GLFWCallbacks.ErrorCallback errorCallback;
     private bool disposed;
     private int? joystickId;
     private int pollsWithoutGamepad;
+    private AxisLayout layout;
 
     // Detección del rango de los triggers. Algunos dispositivos (xpad clásico)
     // reportan los triggers en [-1, +1] con reposo en -1. Otros (varios gamepads
@@ -109,12 +144,9 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             return GamepadState.Disconnected;
         }
 
-        ushort bits = 0;
+        DetectLayout(axsPtr, btnCount, DeviceName ?? string.Empty);
 
-        // Botones 0..10 → A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3 (orden xpad estándar).
-        int btns = Math.Min(btnCount, 11);
-        for (int i = 0; i < btns; i++)
-            if (btnPtr[i] != JoystickInputAction.Release) bits |= (ushort)(1 << i);
+        ushort bits = ReadFaceButtons(btnPtr, btnCount);
 
         // D-pad: axes 6 (X) y 7 (Y) en xpad moderno, o hat 0 como fallback.
         if (axsCount >= 8)
@@ -140,17 +172,98 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         }
 
         // Sticks: Y se invierte para que arriba sea +1 (xpad reporta arriba=-1).
+        // Índices según layout detectado.
+        int idxLT, idxRT, idxRX, idxRY;
+        switch (layout)
+        {
+            case AxisLayout.Ds4Amazon:
+                idxLT = 3; idxRT = 4; idxRX = 2; idxRY = 5;
+                break;
+            case AxisLayout.GameSirPs4:
+                idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
+                break;
+            default: // Xpad
+                idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
+                break;
+        }
+
         float leftX  =  axsPtr[0];
         float leftY  = -axsPtr[1];
-        float rightX =  axsPtr[3];
-        float rightY = -axsPtr[4];
+        float rightX =  axsPtr[idxRX];
+        float rightY = -axsPtr[idxRY];
 
-        if (axsPtr[2] < -0.05f) ltRangeSigned = true;
-        if (axsPtr[5] < -0.05f) rtRangeSigned = true;
-        float leftT  = NormalizeTrigger(axsPtr[2], ltRangeSigned);
-        float rightT = NormalizeTrigger(axsPtr[5], rtRangeSigned);
+        if (axsPtr[idxLT] < -0.05f) ltRangeSigned = true;
+        if (axsPtr[idxRT] < -0.05f) rtRangeSigned = true;
+        float leftT  = NormalizeTrigger(axsPtr[idxLT], ltRangeSigned);
+        float rightT = NormalizeTrigger(axsPtr[idxRT], rtRangeSigned);
 
         return new GamepadState(bits, leftX, leftY, rightX, rightY, leftT, rightT);
+    }
+
+    // Heurística sticky: una vez detectado, no vuelve a Unknown hasta desconexión.
+    // Orden de chequeo (priorizamos signals más específicos):
+    //   1. Nombre coincide con GameSir/Chicken Run → GameSirPs4. Necesario
+    //      porque su firma de ejes (signed triggers a2/a5) coincide con xpad
+    //      clásico de Linux, así que sin nombre no se puede distinguir.
+    //   2. a3 o a4 < -0.9 al primer poll → Ds4Amazon. Firma exclusiva (los
+    //      sticks no llegan a -1 en reposo, así que sólo aparece en layouts
+    //      con triggers signed en posiciones 3/4).
+    //   3. Default → Xpad.
+    private unsafe void DetectLayout(float* axsPtr, int btnCount, string deviceName)
+    {
+        if (layout != AxisLayout.Unknown) return;
+
+        if (deviceName.Contains("Chicken Run", StringComparison.OrdinalIgnoreCase) ||
+            deviceName.Contains("GameSir",     StringComparison.OrdinalIgnoreCase))
+        {
+            layout = AxisLayout.GameSirPs4;
+            ltRangeSigned = true;
+            rtRangeSigned = true;
+            logger.Notification(
+                $"GamepadCompanion: detected GameSirPs4 layout by name (btnCount={btnCount})");
+            return;
+        }
+
+        if (axsPtr[3] < Ds4LayoutThreshold || axsPtr[4] < Ds4LayoutThreshold)
+        {
+            layout = AxisLayout.Ds4Amazon;
+            ltRangeSigned = true;
+            rtRangeSigned = true;
+            logger.Notification(
+                $"GamepadCompanion: detected Ds4Amazon layout by signed triggers " +
+                $"(a3={axsPtr[3]:F2}, a4={axsPtr[4]:F2}, btnCount={btnCount})");
+            return;
+        }
+
+        layout = AxisLayout.Xpad;
+    }
+
+    private unsafe ushort ReadFaceButtons(JoystickInputAction* btnPtr, int btnCount)
+    {
+        ushort bits = 0;
+        int[]? map = layout switch
+        {
+            AxisLayout.Ds4Amazon  => Ds4AmazonButtonMap,
+            AxisLayout.GameSirPs4 => GameSirPs4ButtonMap,
+            _                     => null,
+        };
+
+        if (map is not null)
+        {
+            for (int bit = 0; bit < map.Length; bit++)
+            {
+                int raw = map[bit];
+                if (raw < btnCount && btnPtr[raw] != JoystickInputAction.Release)
+                    bits |= (ushort)(1 << bit);
+            }
+        }
+        else
+        {
+            int btns = Math.Min(btnCount, 11);
+            for (int i = 0; i < btns; i++)
+                if (btnPtr[i] != JoystickInputAction.Release) bits |= (ushort)(1 << i);
+        }
+        return bits;
     }
 
     private static float NormalizeTrigger(float raw, bool signedRange)
@@ -183,6 +296,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         pollsWithoutGamepad = 0;
         ltRangeSigned = false;
         rtRangeSigned = false;
+        layout = AxisLayout.Unknown;
     }
 
     private unsafe void LogDiagnosticScan()
