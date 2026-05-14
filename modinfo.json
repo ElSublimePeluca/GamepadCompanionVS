@@ -7,7 +7,7 @@
         "ElSublimePeluca"
     ],
     "description": "Native gamepad support for Vintage Story: configurable radial menu, button remapping, toggleable modifier keys, virtual cursor for GUI navigation. UI in Spanish.",
-    "version": "1.1.0",
+    "version": "1.1.1-trace",
     "dependencies": {
         "game": "1.22.0"
     }

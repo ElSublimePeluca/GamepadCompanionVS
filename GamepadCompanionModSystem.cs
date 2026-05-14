@@ -20,6 +20,7 @@ public class GamepadCompanionModSystem : ModSystem
     private VirtualCursorRenderer? cursorRenderer;
     private GamepadCompanionConfig? config;
     private ToggleHudOverlay? toggleHud;
+    private InputTracer? tracer;
 
     // Expone el driver para que helpers globales (BuiltinActions, etc.)
     // accedan a estado del input sin acoplarse al ModSystem en cada call.
@@ -39,7 +40,8 @@ public class GamepadCompanionModSystem : ModSystem
 
         gamepad = new GlfwGamepadProvider(api.Logger);
         driver = new GamepadInputDriver(api, config);
-        renderer = new GamepadRenderer(gamepad, driver);
+        tracer = new InputTracer(api, gamepad, driver.Toggles);
+        renderer = new GamepadRenderer(gamepad, driver, tracer);
         toggleHud = new ToggleHudOverlay(api, driver.Toggles);
 
         // Cargar bindings de la rueda desde config. Si el campo está null
@@ -114,6 +116,18 @@ public class GamepadCompanionModSystem : ModSystem
                 var formatted = string.Join(" ", axes.Select((v, i) => $"a{i}={v:+0.00;-0.00;0.00}"));
                 api.Logger.Notification($"GamepadCompanion: raw axes: {formatted}");
                 return TextCommandResult.Success(formatted);
+            });
+
+        api.ChatCommands.Create("gptrace")
+            .WithDescription("Log per-frame gamepad state for N seconds (default 15, max 60)")
+            .WithArgs(parsers.OptionalFloat("seconds", 15f))
+            .HandleWith(args =>
+            {
+                if (tracer is null) return TextCommandResult.Error("tracer not initialized");
+                float requested = (float)args[0];
+                float actual = tracer.Start(requested);
+                return TextCommandResult.Success(
+                    $"gptrace started: {actual:F1}s — output to client-main.log");
             });
 
         api.ChatCommands.Create("gpyaw")

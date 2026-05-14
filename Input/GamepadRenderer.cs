@@ -15,13 +15,16 @@ public sealed class GamepadRenderer : IRenderer
 {
     private readonly IGamepadProvider gamepad;
     private readonly GamepadInputDriver driver;
+    private readonly InputTracer tracer;
     private GamepadState previousState;
     private long lastTimestamp;
 
-    public GamepadRenderer(IGamepadProvider gamepad, GamepadInputDriver driver)
+    public GamepadRenderer(IGamepadProvider gamepad, GamepadInputDriver driver,
+                           InputTracer tracer)
     {
         this.gamepad = gamepad;
         this.driver = driver;
+        this.tracer = tracer;
         previousState = GamepadState.Disconnected;
     }
 
@@ -38,6 +41,10 @@ public sealed class GamepadRenderer : IRenderer
 
         var state = gamepad.Poll();
         driver.OnTick(state, previousState, dt);
+        // Trace después de OnTick para que veamos los toggles/EntityControls
+        // *post* aplicación del frame actual — refleja el estado que el
+        // engine usará en el physics tick siguiente.
+        tracer.Capture(state);
         previousState = state;
     }
 

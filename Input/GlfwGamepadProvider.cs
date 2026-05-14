@@ -287,6 +287,18 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         return result;
     }
 
+    public unsafe byte[] GetRawButtonsSnapshot()
+    {
+        if (joystickId is not int jid || !GLFW.JoystickPresent(jid))
+            return Array.Empty<byte>();
+        JoystickInputAction* p = GLFW.GetJoystickButtonsRaw(jid, out int count);
+        if (p == null) return Array.Empty<byte>();
+        var result = new byte[count];
+        for (int i = 0; i < count; i++)
+            result[i] = (byte)(p[i] != JoystickInputAction.Release ? 1 : 0);
+        return result;
+    }
+
     private void ReleaseGamepad(string reason)
     {
         if (joystickId is int jid)

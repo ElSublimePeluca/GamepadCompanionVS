@@ -8,4 +8,5 @@ public interface IGamepadProvider : IDisposable
     string? DeviceName { get; }
     GamepadState Poll();
     float[] GetRawAxesSnapshot();
+    byte[] GetRawButtonsSnapshot();
 }
