@@ -10,14 +10,16 @@ namespace GamepadCompanion.Input;
 // botones 0..10 en orden A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3,
 // axes 0..5 en orden LX,LY,LT,RX,RY,RT, dpad como axes 6/7 o como hat 0.
 //
-// Detecta tres layouts distintos vía firma:
-//   Xpad        — XInput / xpad estándar. Default fallback.
+// Detecta cinco layouts distintos vía firma:
+//   Xpad        — Linux xpad clásico. Default fallback.
 //                 axes: LX,LY,LT,RX,RY,RT (0..5)
 //                 buttons: A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3 (0..10)
 //   Ds4Amazon   — PS4-DInput "estándar Sony", visto en el control
-//                 "Wired Controller" (Amazon B0CZ3WKF58). Firma: a3 o a4 ≈ -1
-//                 al primer poll (triggers signed en posiciones 3/4 — los
-//                 sticks no llegan a -1 en reposo, así que es exclusivo).
+//                 "Wired Controller" (Amazon B0CZ3WKF58, Ubsvaky LBE-PS4).
+//                 Firma: a3 Y a4 ambos ≈ -1 al primer poll (los dos triggers
+//                 signed en posiciones 3/4 en reposo). Hay que pedir AMBOS,
+//                 no uno solo, porque WinXInput también reporta a4 signed
+//                 (LT) — chequeando los dos a la vez se evita el falso match.
 //                 axes: LX,LY,RX,LT,RT,RY (0..5)
 //                 face buttons: Square,Cross,Circle,Triangle (raw 0..3)
 //   GameSirPs4  — GameSir Cyclone 2 en modo PS4 (probablemente otros del
@@ -29,6 +31,26 @@ namespace GamepadCompanion.Input;
 //                 axes: LX,LY,LT,RX,RY,RT (0..5) — igual a xpad
 //                 face buttons: raw 0=A, 1=B, 2=Y, 3=X (X/Y swapped
 //                 contra xpad en raw 2/3; A y B sí siguen xpad)
+//   WinXInput   — Windows XInput vía GLFW. Reportado por springrain con
+//                 8BitDo Ultimate 2C Wireless en modo Xbox, y por pngwn con
+//                 "Controller (XBOX 360 for Windows)". GLFW en Windows
+//                 normaliza el orden XInput a LX,LY,RX,RY,LT,RT (distinto
+//                 de Linux xpad). Firma: a4 < -0.9 al primer poll (LT
+//                 signed en reposo) pero a3 NO está signed (=0, RY en
+//                 reposo) — eso distingue contra Ds4Amazon (a3 ∧ a4).
+//                 axes: LX,LY,RX,RY,LT,RT (0..5)
+//                 buttons: A,B,X,Y,LB,RB,Back,Start,L3,R3 (0..9) — sin
+//                 Guide (XInput no expone la tecla Guide)
+//   XdGamepad   — SHANWAN PS3-DInput "X-D GamePad" (vendor 0x2563). Modo
+//                 secundario del control de pngwn (modelo desconocido, con
+//                 lightbar verde/rojo/azul indicando modo): apretando Home
+//                 5s switchea entre "Controller (XBOX 360 for Windows)" y
+//                 "X-D GamePad". Solo 4 axes (sin trigger axes) y triggers
+//                 expuestos como botones digitales b6/b7. Detección por
+//                 nombre porque 4 axes no es una firma única.
+//                 axes: LX,LY,RX,RY (0..3)
+//                 buttons: A,B,X,Y,LB,RB,LT_btn,RT_btn,Back,Start,L3,R3
+//                 (0..11), Guide ausente. Triggers solo digitales (0 o 1).
 // Los layouts PS4 ignoran raw 6 y 7 (L2btn/R2btn) para evitar que apretar
 // los triggers dispare también ghost-button actions.
 public sealed class GlfwGamepadProvider : IGamepadProvider
@@ -40,15 +62,26 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private const float DpadThreshold = 0.5f;
     private const float Ds4LayoutThreshold = -0.9f;
 
-    private enum AxisLayout { Unknown, Xpad, Ds4Amazon, GameSirPs4 }
+    private enum AxisLayout { Unknown, Xpad, Ds4Amazon, GameSirPs4, WinXInput, XdGamepad }
 
     // bit-index (orden GamepadButton) → raw button index. 11 entradas:
-    // A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3.
+    // A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3. -1 = botón ausente en este layout.
     private static readonly int[] Ds4AmazonButtonMap = {
         1,  2,  0,  3,  4,  5,  8,  9, 10, 11, 12,
     };
     private static readonly int[] GameSirPs4ButtonMap = {
         0,  1,  3,  2,  4,  5,  8,  9, 10, 11, 12,
+    };
+    // GLFW en Windows XInput omite la tecla Guide (XInput la reserva al
+    // sistema), entonces L3/R3 quedan corridos a 8/9 en vez de 9/10.
+    private static readonly int[] WinXInputButtonMap = {
+        0,  1,  2,  3,  4,  5,  6,  7, -1,  8,  9,
+    };
+    // SHANWAN PS3 "X-D GamePad": order Xbox-style (A=0 south, B=1 east), pero
+    // triggers expuestos como botones digitales en raw 6/7 (leídos aparte,
+    // no van al face-button map). Guide ausente en modo DInput.
+    private static readonly int[] XdGamepadButtonMap = {
+        0,  1,  2,  3,  4,  5,  8,  9, -1, 10, 11,
     };
 
     private readonly ILogger logger;
@@ -111,13 +144,15 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         {
             if (!GLFW.JoystickPresent(jid)) continue;
 
-            _ = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
-            _ = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
-            if (btnCount < MinExpectedButtons || axsCount < MinExpectedAxes)
-                continue;
-
             string name = GLFW.GetJoystickName(jid) ?? "<unknown>";
             if (IsKnownNotGamepad(name)) continue;
+
+            _ = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
+            _ = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
+
+            bool standardSig  = btnCount >= MinExpectedButtons && axsCount >= MinExpectedAxes;
+            bool xdGamepadSig = IsXdGamepadName(name) && btnCount >= 12 && axsCount >= 4;
+            if (!standardSig && !xdGamepadSig) continue;
 
             joystickId = jid;
             DeviceName = name;
@@ -133,6 +168,12 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private static bool IsKnownNotGamepad(string name) =>
         name.Contains("Keychron", StringComparison.OrdinalIgnoreCase);
 
+    // SHANWAN PS3 DInput modes: 4 axes + triggers como botones. No pasan el
+    // filtro estándar de MinExpectedAxes=6, hay que matchearlos por nombre.
+    private static bool IsXdGamepadName(string name) =>
+        name.Contains("X-D GamePad", StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("SHANWAN",     StringComparison.OrdinalIgnoreCase);
+
     private unsafe GamepadState PollRaw(int jid)
     {
         JoystickInputAction* btnPtr = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
@@ -144,7 +185,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             return GamepadState.Disconnected;
         }
 
-        DetectLayout(axsPtr, btnCount, DeviceName ?? string.Empty);
+        DetectLayout(axsPtr, axsCount, btnCount, DeviceName ?? string.Empty);
 
         ushort bits = ReadFaceButtons(btnPtr, btnCount);
 
@@ -182,6 +223,13 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             case AxisLayout.GameSirPs4:
                 idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
                 break;
+            case AxisLayout.WinXInput:
+                idxLT = 4; idxRT = 5; idxRX = 2; idxRY = 3;
+                break;
+            case AxisLayout.XdGamepad:
+                // Sin trigger axes — se leen de los botones b6/b7 abajo.
+                idxLT = -1; idxRT = -1; idxRX = 2; idxRY = 3;
+                break;
             default: // Xpad
                 idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
                 break;
@@ -192,26 +240,53 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         float rightX =  axsPtr[idxRX];
         float rightY = -axsPtr[idxRY];
 
-        if (axsPtr[idxLT] < -0.05f) ltRangeSigned = true;
-        if (axsPtr[idxRT] < -0.05f) rtRangeSigned = true;
-        float leftT  = NormalizeTrigger(axsPtr[idxLT], ltRangeSigned);
-        float rightT = NormalizeTrigger(axsPtr[idxRT], rtRangeSigned);
+        float leftT, rightT;
+        if (layout == AxisLayout.XdGamepad)
+        {
+            // Triggers digitales: lleno o vacío, sin curva analógica.
+            leftT  = (6 < btnCount && btnPtr[6] != JoystickInputAction.Release) ? 1f : 0f;
+            rightT = (7 < btnCount && btnPtr[7] != JoystickInputAction.Release) ? 1f : 0f;
+        }
+        else
+        {
+            if (axsPtr[idxLT] < -0.05f) ltRangeSigned = true;
+            if (axsPtr[idxRT] < -0.05f) rtRangeSigned = true;
+            leftT  = NormalizeTrigger(axsPtr[idxLT], ltRangeSigned);
+            rightT = NormalizeTrigger(axsPtr[idxRT], rtRangeSigned);
+        }
 
         return new GamepadState(bits, leftX, leftY, rightX, rightY, leftT, rightT);
     }
 
     // Heurística sticky: una vez detectado, no vuelve a Unknown hasta desconexión.
     // Orden de chequeo (priorizamos signals más específicos):
-    //   1. Nombre coincide con GameSir/Chicken Run → GameSirPs4. Necesario
-    //      porque su firma de ejes (signed triggers a2/a5) coincide con xpad
-    //      clásico de Linux, así que sin nombre no se puede distinguir.
-    //   2. a3 o a4 < -0.9 al primer poll → Ds4Amazon. Firma exclusiva (los
-    //      sticks no llegan a -1 en reposo, así que sólo aparece en layouts
-    //      con triggers signed en posiciones 3/4).
-    //   3. Default → Xpad.
-    private unsafe void DetectLayout(float* axsPtr, int btnCount, string deviceName)
+    //   1. Nombre matchea X-D GamePad / SHANWAN → XdGamepad. Necesario por
+    //      nombre porque tiene solo 4 axes (no hay firma de ejes que sirva).
+    //   2. Nombre matchea GameSir/Chicken Run → GameSirPs4. Necesario por
+    //      nombre porque su firma de ejes (signed triggers a2/a5) coincide
+    //      con xpad clásico de Linux.
+    //   3. a3 Y a4 ambos < -0.9 al primer poll → Ds4Amazon. Los dos triggers
+    //      están signed en posiciones 3/4 y en reposo reportan -1.
+    //   4. a4 < -0.9 pero a3 NO < -0.9 al primer poll → WinXInput. Solo LT
+    //      está signed a -1 (RY=a3 está en 0 al reposo). El check de a3 alto
+    //      excluye Ds4Amazon (donde a3 también está en -1).
+    //   5. Default → Xpad. Logueamos los ejes para diagnóstico de layouts
+    //      futuros que caigan acá sin firma conocida.
+    private unsafe void DetectLayout(float* axsPtr, int axsCount, int btnCount,
+                                     string deviceName)
     {
         if (layout != AxisLayout.Unknown) return;
+
+        string axesDump = FormatAxes(axsPtr, axsCount);
+
+        if (IsXdGamepadName(deviceName))
+        {
+            layout = AxisLayout.XdGamepad;
+            logger.Notification(
+                $"GamepadCompanion: detected XdGamepad layout by name " +
+                $"(btnCount={btnCount}, axes={axesDump})");
+            return;
+        }
 
         if (deviceName.Contains("Chicken Run", StringComparison.OrdinalIgnoreCase) ||
             deviceName.Contains("GameSir",     StringComparison.OrdinalIgnoreCase))
@@ -220,22 +295,55 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             ltRangeSigned = true;
             rtRangeSigned = true;
             logger.Notification(
-                $"GamepadCompanion: detected GameSirPs4 layout by name (btnCount={btnCount})");
+                $"GamepadCompanion: detected GameSirPs4 layout by name " +
+                $"(btnCount={btnCount}, axes={axesDump})");
             return;
         }
 
-        if (axsPtr[3] < Ds4LayoutThreshold || axsPtr[4] < Ds4LayoutThreshold)
+        if (axsCount > 4
+            && axsPtr[3] < Ds4LayoutThreshold
+            && axsPtr[4] < Ds4LayoutThreshold)
         {
             layout = AxisLayout.Ds4Amazon;
             ltRangeSigned = true;
             rtRangeSigned = true;
             logger.Notification(
                 $"GamepadCompanion: detected Ds4Amazon layout by signed triggers " +
-                $"(a3={axsPtr[3]:F2}, a4={axsPtr[4]:F2}, btnCount={btnCount})");
+                $"(btnCount={btnCount}, axes={axesDump})");
+            return;
+        }
+
+        if (axsCount > 5
+            && axsPtr[4] < Ds4LayoutThreshold
+            && axsPtr[3] >= Ds4LayoutThreshold)
+        {
+            layout = AxisLayout.WinXInput;
+            ltRangeSigned = true;
+            rtRangeSigned = true;
+            logger.Notification(
+                $"GamepadCompanion: detected WinXInput layout by signed LT at a4 " +
+                $"(btnCount={btnCount}, axes={axesDump})");
             return;
         }
 
         layout = AxisLayout.Xpad;
+        logger.Notification(
+            $"GamepadCompanion: detected Xpad layout (default fallback) " +
+            $"(btnCount={btnCount}, axes={axesDump})");
+    }
+
+    private static unsafe string FormatAxes(float* axsPtr, int axsCount)
+    {
+        var sb = new System.Text.StringBuilder(axsCount * 8 + 2);
+        sb.Append('[');
+        for (int i = 0; i < axsCount; i++)
+        {
+            if (i > 0) sb.Append(' ');
+            sb.AppendFormat(System.Globalization.CultureInfo.InvariantCulture,
+                            "a{0}={1:+0.00;-0.00;0.00}", i, axsPtr[i]);
+        }
+        sb.Append(']');
+        return sb.ToString();
     }
 
     private unsafe ushort ReadFaceButtons(JoystickInputAction* btnPtr, int btnCount)
@@ -245,6 +353,8 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         {
             AxisLayout.Ds4Amazon  => Ds4AmazonButtonMap,
             AxisLayout.GameSirPs4 => GameSirPs4ButtonMap,
+            AxisLayout.WinXInput  => WinXInputButtonMap,
+            AxisLayout.XdGamepad  => XdGamepadButtonMap,
             _                     => null,
         };
 
@@ -253,7 +363,8 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             for (int bit = 0; bit < map.Length; bit++)
             {
                 int raw = map[bit];
-                if (raw < btnCount && btnPtr[raw] != JoystickInputAction.Release)
+                if (raw >= 0 && raw < btnCount
+                    && btnPtr[raw] != JoystickInputAction.Release)
                     bits |= (ushort)(1 << bit);
             }
         }
