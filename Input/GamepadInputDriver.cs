@@ -20,6 +20,7 @@ public sealed class GamepadInputDriver
     private readonly RadialMenuDialog radial;
     private readonly VirtualCursor cursor;
     private readonly CursorClickMapper cursorClicks;
+    private readonly WorldMapZoomMapper worldMapZoom;
 
     public ToggleManager Toggles => toggles;
     public RadialMenuDialog Radial => radial;
@@ -46,6 +47,7 @@ public sealed class GamepadInputDriver
         toggles = new ToggleManager(capi);
         radial = new RadialMenuDialog(capi);
         cursorClicks = new CursorClickMapper(capi, cursor);
+        worldMapZoom = new WorldMapZoomMapper(capi);
     }
 
     public void OnTick(GamepadState current, GamepadState previous, float dt)
@@ -96,6 +98,11 @@ public sealed class GamepadInputDriver
             int fw = capi.Render.FrameWidth;
             int fh = capi.Render.FrameHeight;
             cursor.Show(fw, fh);
+            // WorldMap (full-screen): DPad↑/↓ hacen zoom emitiendo MouseWheel
+            // al dialog en vez de mover el cursor virtual. DPad←/→ siguen
+            // navegando con step para que el cursor pueda alcanzar waypoints
+            // o botones de UI del mapa.
+            bool worldMapZooming = worldMapZoom.Apply(current, previous);
             if (smoothMode)
             {
                 cursor.Update(current.RightStickX, current.RightStickY, dt,
@@ -103,7 +110,8 @@ public sealed class GamepadInputDriver
             }
             else
             {
-                ApplyDPadStep(current, previous, fw, fh);
+                ApplyDPadStep(current, previous, fw, fh,
+                              skipVertical: worldMapZooming);
                 // En step mode el cursor no se mueve entre pulsos del DPad,
                 // pero seguimos sincronizando OS/ClientMain por frame para
                 // que el render del item arrastrado en HudDropItem no se
@@ -142,12 +150,13 @@ public sealed class GamepadInputDriver
     private const int SlotStepPx = 52;
 
     private void ApplyDPadStep(GamepadState current, GamepadState previous,
-                               int fw, int fh)
+                               int fw, int fh, bool skipVertical = false)
     {
         if (current.WasPressed(GamepadButton.DPadLeft, previous))
             cursor.Step(-SlotStepPx, 0, fw, fh);
         if (current.WasPressed(GamepadButton.DPadRight, previous))
             cursor.Step(+SlotStepPx, 0, fw, fh);
+        if (skipVertical) return;
         if (current.WasPressed(GamepadButton.DPadUp, previous))
             cursor.Step(0, -SlotStepPx, fw, fh);
         if (current.WasPressed(GamepadButton.DPadDown, previous))

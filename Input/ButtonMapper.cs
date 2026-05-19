@@ -66,14 +66,17 @@ public sealed class ButtonMapper
             ExecuteOrDefault(GamepadButton.Back,      () => hotkeys.Trigger("worldmapdialog"));
         if (current.WasPressed(GamepadButton.Start,     previous))
             ExecuteOrDefault(GamepadButton.Start,     () => hotkeys.Trigger("escapemenudialog"));
+        // DPad defaults se gatean en cursor.Visible: con el cursor virtual
+        // activo (dialog modal abierto), DPad navega UI en GamepadInputDriver
+        // (step del cursor, zoom del worldmap, etc) — no debe disparar el
+        // toggle de precisión, la tecla G, ni cambiar hotbar slot. Si el
+        // usuario tiene un override binding para DPad, lo respetamos igual.
         if (current.WasPressed(GamepadButton.DPadUp,    previous))
             ExecuteOrDefault(GamepadButton.DPadUp,    null);
         if (current.WasPressed(GamepadButton.DPadDown,  previous))
-            ExecuteOrDefault(GamepadButton.DPadDown,  () => SitDefault.Execute(capi));
-        // DPad defaults se gatean en cursor.Visible: con el cursor virtual
-        // activo (dialog abierto), DPad navega slots del inventario en
-        // GamepadInputDriver, no cambia hotbar slot. Si el usuario tiene un
-        // override binding para DPad, lo respetamos igual.
+            ExecuteOrDefault(GamepadButton.DPadDown,
+                cursor.Visible ? null
+                               : (System.Action)(() => SitDefault.Execute(capi)));
         if (current.WasPressed(GamepadButton.DPadLeft,  previous))
             ExecuteOrDefault(GamepadButton.DPadLeft,
                 cursor.Visible ? null

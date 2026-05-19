@@ -22,6 +22,15 @@ public sealed class MovementMapper
         var controls = capi.World?.Player?.Entity?.Controls;
         if (controls is null) return;
 
+        // FloorSitting bloquea el movimiento: al setear controls.Forward=true
+        // el setter pasa por AttemptToggleAction → OnAction, pero ningún
+        // handler vanilla cancela el move-while-seated (el teclado nunca
+        // genera ese estado porque WASD primero unsitea). Sin este gate,
+        // sentarse con DPad↓ y mover el stick L hacía caminar al personaje
+        // sentado. Si el usuario quiere moverse, presiona DPad↓ otra vez
+        // para levantarse.
+        if (controls.FloorSitting) return;
+
         float x = current.LeftStickX;
         float y = current.LeftStickY;
 
