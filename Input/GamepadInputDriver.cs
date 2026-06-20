@@ -54,13 +54,23 @@ public sealed class GamepadInputDriver
     {
         if (!current.IsConnected) return;
 
+        // Con el juego pausado (menú Escape) el render — y por ende este
+        // OnTick — sigue corriendo, pero escribir flags a EntityControls
+        // dispara TriggerInWorldAction. Mods de combate como CombatOverhaul
+        // (overhaulliblegacycompat) enganchan esa acción y llaman
+        // RegisterCallback, prohibido en pausa → crash con developermode on.
+        // Movement y triggers son los únicos mappers que emiten acciones de
+        // mundo, así que se gatean; cursor/radial/cámara siguen activos para
+        // poder navegar menús con el control en pausa.
+        bool paused = capi.IsGamePaused;
+
         // El radial corre primero. Si está activo, los demás mappers (cámara,
         // botones, triggers, toggles) se saltan: el R stick selecciona slot,
         // B cancela. Movement sigue habilitado a propósito — caminar mientras
         // se elige slot es UX estándar.
         radial.OnGamepadTick(current, previous);
 
-        movement.Apply(current);
+        if (!paused) movement.Apply(current);
 
         if (radial.IsActive)
         {
@@ -136,7 +146,8 @@ public sealed class GamepadInputDriver
 
             float factor = toggles.PrecisionActive ? config.PrecisionFactor : 1f;
             camera.Apply(current, dt, factor);
-            triggers.Apply(current, previous);
+            if (paused) triggers.Release();
+            else triggers.Apply(current, previous);
         }
 
         buttons.Apply(current, previous);
