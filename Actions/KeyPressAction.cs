@@ -1,5 +1,6 @@
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
 
 namespace GamepadCompanion.Actions;
@@ -70,6 +71,6 @@ public sealed class KeyPressAction : IGameAction
         if (shift) parts.Add("Shift");
         if (alt)   parts.Add("Alt");
         parts.Add(key.ToString());
-        return "Tecla " + string.Join("+", parts);
+        return Lang.Get("gamepadcompanion:keypress-label", string.Join("+", parts));
     }
 }

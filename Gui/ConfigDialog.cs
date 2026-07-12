@@ -5,6 +5,7 @@ using GamepadCompanion.Actions;
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Gui;
 
@@ -63,9 +64,11 @@ public sealed class ConfigDialog : GuiDialog
     // El builder de combinaciones recibe solo los base — no se anidan
     // composites ni se anidan key presses.
     // Sin emojis porque la fuente Cairo no tiene glifos extendidos.
-    private const string CompositeEntryLabel = "[Combinar varias acciones...]";
-    private const string KeyPressEntryLabel  = "[Asignar una tecla individual...]";
-    private const int    MetaEntryCount      = 2; // composite + keypress
+    private static string CompositeEntryLabel =>
+        Lang.Get("gamepadcompanion:picker-composite-entry");
+    private static string KeyPressEntryLabel =>
+        Lang.Get("gamepadcompanion:picker-keypress-entry");
+    private const int MetaEntryCount = 2; // composite + keypress
 
     private enum EntryKind { None, HotKey, OpenDialog, Builtin }
     private string[] entryCodes       = Array.Empty<string>();
@@ -130,7 +133,7 @@ public sealed class ConfigDialog : GuiDialog
             .ToList();
 
         var codes = new List<string> { "" };
-        var names = new List<string> { "— (ninguno)" };
+        var names = new List<string> { Lang.Get("gamepadcompanion:entry-none") };
         var kinds = new List<EntryKind> { EntryKind.None };
         var types = new List<string> { "" };
         foreach (var (code, name, kind, dialogType) in list)
@@ -159,18 +162,21 @@ public sealed class ConfigDialog : GuiDialog
 
         var tabs = new[]
         {
-            new GuiTab { Name = "Rueda",        DataInt = TabWheel,
+            new GuiTab { Name = Lang.Get("gamepadcompanion:tab-wheel"),
+                         DataInt = TabWheel,
                          Active = currentTab == TabWheel },
-            new GuiTab { Name = "Botones",      DataInt = TabButtons,
+            new GuiTab { Name = Lang.Get("gamepadcompanion:tab-buttons"),
+                         DataInt = TabButtons,
                          Active = currentTab == TabButtons },
-            new GuiTab { Name = "Sensibilidad", DataInt = TabSensitivity,
+            new GuiTab { Name = Lang.Get("gamepadcompanion:tab-sensitivity"),
+                         DataInt = TabSensitivity,
                          Active = currentTab == TabSensitivity },
         };
 
         var compo = capi.Gui
             .CreateCompo("gpcompanion-config", dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar("GamepadCompanion - Configuración",
+            .AddDialogTitleBar(Lang.Get("gamepadcompanion:config-title"),
                                OnTitleBarClose, bounds: titleBarBounds)
             .BeginChildElements(bgBounds)
             .AddHorizontalTabs(tabs, tabBarBounds, OnTabClicked,
@@ -188,7 +194,7 @@ public sealed class ConfigDialog : GuiDialog
         var closeBounds = ElementBounds.Fixed(
             Margin, DialogH - FooterH - Margin,
             DialogW - 2 * Margin, FooterH);
-        compo.AddSmallButton("Cerrar",
+        compo.AddSmallButton(Lang.Get("gamepadcompanion:close"),
                              () => { TryClose(); return true; },
                              closeBounds);
 
@@ -212,9 +218,10 @@ public sealed class ConfigDialog : GuiDialog
             var btnBounds = ElementBounds
                 .Fixed(Margin + WheelSlotLabelW + 8, y, WheelSlotBtnW, WheelRowH);
 
-            string slotLabel = bindings[slot]?.Label ?? "— (ninguno)";
+            string slotLabel = bindings[slot]?.Label
+                               ?? Lang.Get("gamepadcompanion:entry-none");
 
-            compo.AddStaticText($"Slot {slot + 1}",
+            compo.AddStaticText(Lang.Get("gamepadcompanion:slot-label", slot + 1),
                                 CairoFont.WhiteSmallText(), labelBounds);
             compo.AddSmallButton(slotLabel,
                                  () => { OpenPicker(slot); return true; },
@@ -230,7 +237,7 @@ public sealed class ConfigDialog : GuiDialog
         var resetBounds = ElementBounds.Fixed(
             Margin, y + WheelResetGap,
             DialogW - 2 * Margin, WheelResetH);
-        compo.AddSmallButton("Restaurar predeterminados",
+        compo.AddSmallButton(Lang.Get("gamepadcompanion:restore-defaults"),
                              () => { RestoreWheelDefaults(); return true; },
                              resetBounds, EnumButtonStyle.Normal);
     }
@@ -256,7 +263,7 @@ public sealed class ConfigDialog : GuiDialog
                 .Fixed(Margin + BtnLabelW + 8, y, BtnPickerW, BtnRowH);
 
             string current = buttonBindings[thisBtn]?.Label
-                             ?? "— predeterminado —";
+                             ?? Lang.Get("gamepadcompanion:button-default");
 
             compo.AddStaticText(ButtonDisplayName(thisBtn),
                                 CairoFont.WhiteSmallText(), labelBounds);
@@ -292,14 +299,14 @@ public sealed class ConfigDialog : GuiDialog
         int currentIdx = CurrentButtonPickerIndex(btn);
         var picker = new HotKeyPickerDialog(
             capi,
-            $"{ButtonDisplayName(btn)}: elegir acción",
+            Lang.Get("gamepadcompanion:pick-action-title", ButtonDisplayName(btn)),
             pickerNames,
             currentIdx,
             pickedIdx => ApplyButtonPick(btn, pickedIdx),
             // En la tab Botones, "vaciar" significa volver al
             // comportamiento default hardcoded del ButtonMapper
             // (drop/dismiss en B, etc.), no "no hace nada".
-            clearButtonLabel: "Restaurar predeterminado");
+            clearButtonLabel: Lang.Get("gamepadcompanion:restore-default"));
         picker.TryOpen();
     }
 
@@ -366,17 +373,20 @@ public sealed class ConfigDialog : GuiDialog
         double y = startY;
 
         // Yaw sensitivity
-        AddSensitivityRow(compo, ref y, "Sensibilidad horizontal", "yaw",
+        AddSensitivityRow(compo, ref y,
+            Lang.Get("gamepadcompanion:sens-yaw"), "yaw",
             (int)config.YawSensitivity, 100, 5000, 50, "",
             v => { config.YawSensitivity = v; onChanged?.Invoke(); return true; });
 
         // Pitch sensitivity
-        AddSensitivityRow(compo, ref y, "Sensibilidad vertical", "pitch",
+        AddSensitivityRow(compo, ref y,
+            Lang.Get("gamepadcompanion:sens-pitch"), "pitch",
             (int)config.PitchSensitivity, 100, 5000, 50, "",
             v => { config.PitchSensitivity = v; onChanged?.Invoke(); return true; });
 
         // Dead zone (escalado *100 para que el slider trabaje en int)
-        AddSensitivityRow(compo, ref y, "Dead zone (%)", "deadzone",
+        AddSensitivityRow(compo, ref y,
+            Lang.Get("gamepadcompanion:sens-deadzone"), "deadzone",
             (int)(config.Deadzone * 100), 0, 50, 1, "%",
             v => { config.Deadzone = v / 100f; onChanged?.Invoke(); return true; });
 
@@ -385,7 +395,7 @@ public sealed class ConfigDialog : GuiDialog
             .Fixed(Margin, y + 6, SensLabelW, SensRowH);
         var switchBounds = ElementBounds
             .Fixed(Margin + SensLabelW + 8, y, 30, 30);
-        compo.AddStaticText("Invertir pitch",
+        compo.AddStaticText(Lang.Get("gamepadcompanion:sens-invert-pitch"),
                             CairoFont.WhiteSmallText(), labelBounds);
         compo.AddSwitch(v =>
             {
@@ -445,7 +455,8 @@ public sealed class ConfigDialog : GuiDialog
         int currentPickerIdx = CurrentPickerIndex(slot);
         var picker = new HotKeyPickerDialog(
             capi,
-            $"Slot {slot + 1}: elegir acción",
+            Lang.Get("gamepadcompanion:pick-action-title",
+                     Lang.Get("gamepadcompanion:slot-label", slot + 1)),
             pickerNames,
             currentPickerIdx,
             pickedIdx => ApplyPick(slot, pickedIdx));

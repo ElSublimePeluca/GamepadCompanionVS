@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Gui;
 
@@ -55,13 +56,14 @@ public sealed class HotKeyPickerDialog : GuiDialog
         IReadOnlyList<string> entryNames,
         int currentSelectedIndex,
         Action<int> onPick,
-        string clearButtonLabel = "Quitar binding") : base(capi)
+        string? clearButtonLabel = null) : base(capi)
     {
         this.title = title;
         this.entryNames = entryNames;
         this.currentSelectedIndex = currentSelectedIndex;
         this.onPick = onPick;
-        this.clearButtonLabel = clearButtonLabel;
+        this.clearButtonLabel = clearButtonLabel
+            ?? Lang.Get("gamepadcompanion:clear-binding");
         RecomputeFiltered();
         ComposeFrame();
         ComposeList();
@@ -116,7 +118,7 @@ public sealed class HotKeyPickerDialog : GuiDialog
                           CairoFont.WhiteSmallText(), "search")
             .AddCompactVerticalScrollbar(OnScroll, scrollbarBounds, "scrollbar")
             .AddSmallButton(clearButtonLabel, OnClear, clearBounds)
-            .AddSmallButton("Cancelar",
+            .AddSmallButton(Lang.Get("gamepadcompanion:cancel"),
                             () => { OnCancel(); return true; },
                             cancelBounds)
             .EndChildElements()
@@ -177,7 +179,7 @@ public sealed class HotKeyPickerDialog : GuiDialog
             var bounds = ElementBounds.Fixed(
                 Margin, ListAreaY, listW, RowH);
             compo.AddStaticText(
-                "Sin resultados",
+                Lang.Get("gamepadcompanion:no-results"),
                 CairoFont.WhiteDetailText(), bounds);
         }
 

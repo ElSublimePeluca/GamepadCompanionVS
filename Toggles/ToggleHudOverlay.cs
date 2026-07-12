@@ -1,4 +1,5 @@
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Toggles;
 
@@ -65,7 +66,8 @@ public sealed class ToggleHudOverlay : HudElement
                            FontFor(toggles.ShiftActive, suspended),
                            EnumTextOrientation.Right,
                            shiftBounds)
-            .AddStaticText(LabelFor("PRECISIÓN", toggles.PrecisionActive,
+            .AddStaticText(LabelFor(Lang.Get("gamepadcompanion:hud-precision"),
+                                    toggles.PrecisionActive,
                                     suspended),
                            FontFor(toggles.PrecisionActive, suspended),
                            EnumTextOrientation.Right,

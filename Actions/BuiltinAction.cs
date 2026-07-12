@@ -1,4 +1,5 @@
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Actions;
 
@@ -40,13 +41,16 @@ public sealed class BuiltinAction : IGameAction
         }
     }
 
-    public static readonly (string Code, string Label)[] Catalog =
+    // Propiedad (no campo readonly) para que Lang.Get se resuelva en cada
+    // acceso y no quede congelado si el static init corre antes de que el
+    // Lang del mod esté cargado.
+    public static (string Code, string Label)[] Catalog => new[]
     {
-        ("dropItem",      "Soltar item activo"),
-        ("dropOrDismiss", "Cerrar dialog / Soltar item"),
-        ("hotbarPrev",    "Hotbar: slot anterior"),
-        ("hotbarNext",    "Hotbar: slot siguiente"),
-        ("openKeyboard",  "Abrir teclado virtual"),
+        ("dropItem",      Lang.Get("gamepadcompanion:builtin-dropitem")),
+        ("dropOrDismiss", Lang.Get("gamepadcompanion:builtin-dropordismiss")),
+        ("hotbarPrev",    Lang.Get("gamepadcompanion:builtin-hotbarprev")),
+        ("hotbarNext",    Lang.Get("gamepadcompanion:builtin-hotbarnext")),
+        ("openKeyboard",  Lang.Get("gamepadcompanion:builtin-openkeyboard")),
     };
 
     private static string DefaultLabelFor(string code)

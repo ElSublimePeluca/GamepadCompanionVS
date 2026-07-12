@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using GamepadCompanion.Input;
+using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Actions;
 
@@ -42,24 +44,32 @@ public sealed class SlotBindings
     //   slot 11 (11 o'clock):  Configurar   (al lado del teclado)
     public static SlotBindings BuildDefault() => new(new IGameAction?[]
     {
-        new HotKeyAction("characterdialog",      "Personaje"),
-        new OpenLoadedGuiAction("HudDialogChat", "Chat"),
-        new HotKeyAction("handbook",             "Manual"),
+        new HotKeyAction("characterdialog",
+                         Lang.Get("gamepadcompanion:slot-character")),
+        new OpenLoadedGuiAction("HudDialogChat",
+                         Lang.Get("gamepadcompanion:slot-chat")),
+        new HotKeyAction("handbook",
+                         Lang.Get("gamepadcompanion:slot-handbook")),
         null, null, null, null, null, null, null,
-        new BuiltinAction("openKeyboard",        "Teclado virtual"),
-        new HotKeyAction("gpcompanionconfig",    "Configurar"),
+        new BuiltinAction("openKeyboard",
+                         Lang.Get("gamepadcompanion:virtual-keyboard")),
+        new HotKeyAction("gpcompanionconfig",
+                         Lang.Get("gamepadcompanion:slot-configure")),
     });
 
     // Construye SlotBindings desde la config persistida. Si la config es
     // null/inválida, devuelve los defaults (= primer arranque o reset).
-    public static SlotBindings FromConfig(SlotConfig?[]? config)
+    // capi se usa para re-resolver labels en el idioma activo (ver
+    // SlotConfigActions).
+    public static SlotBindings FromConfig(SlotConfig?[]? config,
+                                          ICoreClientAPI capi)
     {
         if (config is null || config.Length != SlotCount)
             return BuildDefault();
 
         var actions = new IGameAction?[SlotCount];
         for (int i = 0; i < SlotCount; i++)
-            actions[i] = ConfigToAction(config[i]);
+            actions[i] = SlotConfigActions.ToAction(config[i], capi);
         return new SlotBindings(actions);
     }
 
@@ -69,39 +79,6 @@ public sealed class SlotBindings
         for (int i = 0; i < SlotCount; i++)
             arr[i] = ActionToConfig(slots[i]);
         return arr;
-    }
-
-    private static IGameAction? ConfigToAction(SlotConfig? cfg)
-    {
-        switch (cfg?.Type)
-        {
-            case "hotkey" when cfg.Code is not null:
-                return new HotKeyAction(cfg.Code, cfg.Label ?? cfg.Code);
-            case "openDialog" when cfg.DialogType is not null:
-                return new OpenLoadedGuiAction(cfg.DialogType,
-                                               cfg.Label ?? cfg.DialogType);
-            case "builtin" when cfg.Code is not null:
-                return new BuiltinAction(cfg.Code, cfg.Label);
-            case "keypress" when cfg.KeyCode is int kc:
-                return new KeyPressAction(kc,
-                    cfg.CtrlPressed, cfg.ShiftPressed, cfg.AltPressed,
-                    cfg.Label);
-            case "composite" when cfg.Children is not null:
-                var children = new System.Collections.Generic.List<IGameAction>();
-                foreach (var sub in cfg.Children)
-                {
-                    var c = ConfigToAction(sub);
-                    // Anidar composite no es soportado: si alguien edita
-                    // el JSON a mano, lo aplanamos descartando.
-                    if (c is not null and not CompositeAction)
-                        children.Add(c);
-                }
-                return children.Count == 0
-                    ? null
-                    : new CompositeAction(children, cfg.Label);
-            default:
-                return null;
-        }
     }
 
     private static SlotConfig? ActionToConfig(IGameAction? action) =>

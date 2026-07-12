@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Actions;
 
@@ -35,6 +36,6 @@ public sealed class CompositeAction : IGameAction
 
     private static string BuildDefaultLabel(IReadOnlyList<IGameAction> children) =>
         children.Count == 0
-            ? "— (vacío)"
+            ? Lang.Get("gamepadcompanion:entry-empty")
             : string.Join(" + ", children.Select(c => c.Label));
 }

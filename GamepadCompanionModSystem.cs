@@ -5,6 +5,7 @@ using GamepadCompanion.Input;
 using GamepadCompanion.Toggles;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.API.Server;
 
 namespace GamepadCompanion;
@@ -48,13 +49,13 @@ public class GamepadCompanionModSystem : ModSystem
         // (primer arranque) o inválido, BuildDefault da el layout por
         // defecto y luego se persiste para que la próxima sesión arranque
         // con la representación serializada (= forma estable del schema).
-        driver.Radial.Bindings = SlotBindings.FromConfig(config.RadialSlots);
+        driver.Radial.Bindings = SlotBindings.FromConfig(config.RadialSlots, api);
         config.RadialSlots = driver.Radial.Bindings.ToConfig();
 
         // Bindings de botones: empty default = todos los botones usan su
         // hardcoded fallback en ButtonMapper. Una entry presente reemplaza
         // ese default para el evento edge-press.
-        driver.Buttons.Bindings = ButtonBindings.FromConfig(config.ButtonBindings);
+        driver.Buttons.Bindings = ButtonBindings.FromConfig(config.ButtonBindings, api);
         config.ButtonBindings = driver.Buttons.Bindings.ToConfig();
 
         api.StoreModConfig(config, ConfigFile);
@@ -79,7 +80,7 @@ public class GamepadCompanionModSystem : ModSystem
         // aparece en el dropdown de slots del propio dialog, así el usuario
         // puede asignarla al radial si quiere.
         api.Input.RegisterHotKey("gpcompanionconfig",
-                                 "GamepadCompanion: abrir configuración",
+                                 Lang.Get("gamepadcompanion:hotkey-open-config"),
                                  GlKeys.Insert, HotkeyType.HelpAndOverlays);
         api.Input.SetHotKeyHandler("gpcompanionconfig", _ =>
         {

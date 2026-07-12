@@ -22,8 +22,11 @@ public sealed class ButtonMapper
     // Default de DPad Down = press G. La tecla G en VS vanilla está
     // bindeada al emote de sentarse (en mods/configs alternativos puede
     // ser otra cosa, pero se queda en la convención del usuario).
-    private static readonly KeyPressAction SitDefault =
-        new((int)Vintagestory.API.Client.GlKeys.G, label: "Tecla G (sentarse)");
+    // Propiedad para que el label se resuelva vía Lang en runtime, no en
+    // static init (que corre antes de que el Lang del mod esté cargado).
+    private static KeyPressAction SitDefault =>
+        new((int)Vintagestory.API.Client.GlKeys.G,
+            label: Vintagestory.API.Config.Lang.Get("gamepadcompanion:key-g-sit"));
 
     private readonly ICoreClientAPI capi;
     private readonly HotkeyDispatcher hotkeys;

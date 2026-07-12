@@ -2,6 +2,7 @@ using System;
 using GamepadCompanion.Actions;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Gui;
 
@@ -50,14 +51,14 @@ public sealed class KeyCaptureDialog : GuiDialog
         SingleComposer = capi.Gui
             .CreateCompo("gpcompanion-keycap", dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar("Capturar tecla", OnCancel,
-                               bounds: titleBarBounds)
+            .AddDialogTitleBar(Lang.Get("gamepadcompanion:capture-key-title"),
+                               OnCancel, bounds: titleBarBounds)
             .BeginChildElements(bgBounds)
-            .AddStaticText("Presioná la tecla a asignar...",
+            .AddStaticText(Lang.Get("gamepadcompanion:capture-key-prompt"),
                            CairoFont.WhiteSmallText(),
                            EnumTextOrientation.Center,
                            bodyBounds)
-            .AddSmallButton("Cancelar",
+            .AddSmallButton(Lang.Get("gamepadcompanion:cancel"),
                             () => { OnCancel(); return true; },
                             cancelBounds)
             .EndChildElements()

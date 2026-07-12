@@ -2,6 +2,7 @@ using System;
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
 
 namespace GamepadCompanion.Gui;
@@ -38,12 +39,14 @@ public sealed class VirtualKeyboardDialog : GuiDialog
         new[] { "z","x","c","v","b","n","m","/","." },
     };
 
-    private static readonly (string Label, int KeyCode, char Ch)[] Specials =
+    // Labels como lang keys; se resuelven en Compose (no en static init,
+    // que podría correr antes de que el Lang del mod esté cargado).
+    private static readonly (string LabelKey, int KeyCode, char Ch)[] Specials =
     {
-        ("Espacio",  (int)GlKeys.Space,    ' '),
-        ("Borrar",   (int)GlKeys.BackSpace,'\b'),
-        ("Enter",    (int)GlKeys.Enter,    '\n'),
-        ("Cerrar",   -1,                   '\0'),
+        ("gamepadcompanion:vkb-space",     (int)GlKeys.Space,    ' '),
+        ("gamepadcompanion:vkb-backspace", (int)GlKeys.BackSpace,'\b'),
+        ("gamepadcompanion:vkb-enter",     (int)GlKeys.Enter,    '\n'),
+        ("gamepadcompanion:vkb-close",     -1,                   '\0'),
     };
 
     private int row;
@@ -83,7 +86,7 @@ public sealed class VirtualKeyboardDialog : GuiDialog
         var compo = capi.Gui
             .CreateCompo("gpcompanion-vkb", dialogBounds)
             .AddShadedDialogBG(bgBounds, withTitleBar: false, alpha: 0.7f)
-            .AddStaticText("Teclado virtual",
+            .AddStaticText(Lang.Get("gamepadcompanion:virtual-keyboard"),
                            CairoFont.WhiteSmallText(),
                            EnumTextOrientation.Center, titleBounds)
             .BeginChildElements(bgBounds);
@@ -127,7 +130,7 @@ public sealed class VirtualKeyboardDialog : GuiDialog
             font.WithWeight(Cairo.FontWeight.Bold);
             if (selected)
                 font.WithStroke(new[] { 0.0, 0.0, 0.0, 0.9 }, 2.0);
-            compo.AddStaticText("[" + Specials[s].Label + "]", font,
+            compo.AddStaticText("[" + Lang.Get(Specials[s].LabelKey) + "]", font,
                                 EnumTextOrientation.Center, bounds);
         }
 

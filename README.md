@@ -4,7 +4,7 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 
 > **Estado**: usable, probado a fondo en Linux con un GameSir Cyclone 2. Cross-platform/cross-controller compatible en teoría — ver [compatibilidad](#compatibilidad) abajo.
 
-> **Idioma de UI**: español, hardcodeado. Decisión consciente — el mod es ante todo un proyecto personal del autor (hispanohablante). Si querés contribuir traducciones a otros idiomas via `Lang.Get()` + `assets/gamepadcompanion/lang/*.json`, PRs bienvenidos.
+> **Idioma de UI**: localizado vía `Lang.Get()` con archivos en `assets/gamepadcompanion/lang/` — inglés (`en.json`, fallback), español latino (`es-419.json`) y español peninsular (`es-es.json`). El idioma se toma del cliente de VS. Para contribuir otro idioma alcanza con agregar el JSON correspondiente; PRs bienvenidos.
 
 ## Qué hace
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using GamepadCompanion.Input;
+using Vintagestory.API.Client;
 
 namespace GamepadCompanion.Actions;
 
@@ -48,8 +49,10 @@ public sealed class ButtonBindings
 
     public static ButtonBindings BuildDefault() => new();
 
+    // capi se usa para re-resolver labels en el idioma activo (ver
+    // SlotConfigActions).
     public static ButtonBindings FromConfig(
-        Dictionary<string, SlotConfig?>? config)
+        Dictionary<string, SlotConfig?>? config, ICoreClientAPI capi)
     {
         var result = new ButtonBindings();
         if (config is null) return result;
@@ -58,7 +61,7 @@ public sealed class ButtonBindings
         {
             if (!System.Enum.TryParse<GamepadButton>(key, out var btn))
                 continue;
-            var action = SlotConfigToAction(slot);
+            var action = SlotConfigActions.ToAction(slot, capi);
             if (action is not null) result.map[btn] = action;
         }
         return result;
@@ -73,39 +76,6 @@ public sealed class ButtonBindings
             if (cfg is not null) dict[btn.ToString()] = cfg;
         }
         return dict;
-    }
-
-    // Reuso la misma forma de SlotConfig que SlotBindings — tipos
-    // hotkey/openDialog/builtin/composite con discriminador.
-    private static IGameAction? SlotConfigToAction(SlotConfig? cfg)
-    {
-        switch (cfg?.Type)
-        {
-            case "hotkey" when cfg.Code is not null:
-                return new HotKeyAction(cfg.Code, cfg.Label ?? cfg.Code);
-            case "openDialog" when cfg.DialogType is not null:
-                return new OpenLoadedGuiAction(cfg.DialogType,
-                                               cfg.Label ?? cfg.DialogType);
-            case "builtin" when cfg.Code is not null:
-                return new BuiltinAction(cfg.Code, cfg.Label);
-            case "keypress" when cfg.KeyCode is int kc:
-                return new KeyPressAction(kc,
-                    cfg.CtrlPressed, cfg.ShiftPressed, cfg.AltPressed,
-                    cfg.Label);
-            case "composite" when cfg.Children is not null:
-                var children = new List<IGameAction>();
-                foreach (var sub in cfg.Children)
-                {
-                    var c = SlotConfigToAction(sub);
-                    if (c is not null and not CompositeAction)
-                        children.Add(c);
-                }
-                return children.Count == 0
-                    ? null
-                    : new CompositeAction(children, cfg.Label);
-            default:
-                return null;
-        }
     }
 
     private static SlotConfig? ActionToSlotConfig(IGameAction? action) =>

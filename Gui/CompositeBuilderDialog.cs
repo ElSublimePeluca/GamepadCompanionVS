@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GamepadCompanion.Actions;
 using Vintagestory.API.Client;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Gui;
 
@@ -72,8 +73,8 @@ public sealed class CompositeBuilderDialog : GuiDialog
         var compo = capi.Gui
             .CreateCompo("gpcompanion-composite", dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar("Combinación de acciones", OnCancel,
-                               bounds: titleBarBounds)
+            .AddDialogTitleBar(Lang.Get("gamepadcompanion:composite-title"),
+                               OnCancel, bounds: titleBarBounds)
             .BeginChildElements(bgBounds);
 
         double y = bodyY;
@@ -86,9 +87,10 @@ public sealed class CompositeBuilderDialog : GuiDialog
                 .Fixed(Margin + LabelW + 8, y,
                        DialogW - 2 * Margin - LabelW - 8, RowH);
 
-            string stepLabel = steps[i]?.Label ?? "— (vacío)";
+            string stepLabel = steps[i]?.Label
+                               ?? Lang.Get("gamepadcompanion:entry-empty");
 
-            compo.AddStaticText($"Paso {i + 1}",
+            compo.AddStaticText(Lang.Get("gamepadcompanion:step-label", i + 1),
                                 CairoFont.WhiteSmallText(), labelBounds);
             compo.AddSmallButton(stepLabel,
                                  () => { OpenPicker(step); return true; },
@@ -102,8 +104,9 @@ public sealed class CompositeBuilderDialog : GuiDialog
         var cancelBounds = ElementBounds.Fixed(
             Margin + btnW + FooterGap, footerY, btnW, FooterH);
 
-        compo.AddSmallButton("Aceptar", OnConfirm, okBounds);
-        compo.AddSmallButton("Cancelar",
+        compo.AddSmallButton(Lang.Get("gamepadcompanion:ok"),
+                             OnConfirm, okBounds);
+        compo.AddSmallButton(Lang.Get("gamepadcompanion:cancel"),
                              () => { OnCancel(); return true; },
                              cancelBounds);
 
@@ -116,7 +119,8 @@ public sealed class CompositeBuilderDialog : GuiDialog
         int currentIdx = steps[step] is null ? 0 : indexOfAction(steps[step]!);
         var picker = new HotKeyPickerDialog(
             capi,
-            $"Paso {step + 1}: elegir acción",
+            Lang.Get("gamepadcompanion:pick-action-title",
+                     Lang.Get("gamepadcompanion:step-label", step + 1)),
             entryNames,
             currentIdx,
             picked =>
