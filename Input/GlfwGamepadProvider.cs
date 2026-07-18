@@ -41,6 +41,20 @@ namespace GamepadCompanion.Input;
 //                 axes: LX,LY,RX,RY,LT,RT (0..5)
 //                 buttons: A,B,X,Y,LB,RB,Back,Start,L3,R3 (0..9) — sin
 //                 Guide (XInput no expone la tecla Guide)
+//   XboxBtHid   — Xbox One/Series por Bluetooth en Linux, manejado por el
+//                 driver HID genérico del kernel (no xpad, que es solo USB).
+//                 Reportado por GingeeMaestro con un Xbox One en Steam Deck.
+//                 El descriptor HID de Xbox en modo BT deja huecos en los
+//                 usages: raw 2 (BTN_C) y raw 5 (BTN_Z) no existen físicamente,
+//                 y raw 8/9 (BTN_TL2/TR2) son los triggers en versión digital
+//                 — los ignoramos para no duplicar los trigger axes.
+//                 Firma: mismos ejes que WinXInput (LT signed en a4, a3 no
+//                 signed) pero btnCount >= 15, contra los 14 que reporta GLFW
+//                 en Windows XInput (10 botones + 4 del hat). El device del
+//                 log traía 19 = 15 reales + 4 del hat.
+//                 axes: LX,LY,RX,RY,LT,RT (0..5) — igual a WinXInput
+//                 buttons: A,B,_,X,Y,_,LB,RB,LT_btn,RT_btn,Back,Start,Guide,
+//                 L3,R3 (0..14). D-pad vía hat 0 (solo 6 axes).
 //   XdGamepad   — SHANWAN PS3-DInput "X-D GamePad" (vendor 0x2563). Modo
 //                 secundario del control de pngwn (modelo desconocido, con
 //                 lightbar verde/rojo/azul indicando modo): apretando Home
@@ -62,7 +76,12 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private const float DpadThreshold = 0.5f;
     private const float Ds4LayoutThreshold = -0.9f;
 
-    private enum AxisLayout { Unknown, Xpad, Ds4Amazon, GameSirPs4, WinXInput, XdGamepad }
+    private const int XboxBtHidMinButtons = 15;
+
+    private enum AxisLayout
+    {
+        Unknown, Xpad, Ds4Amazon, GameSirPs4, WinXInput, XdGamepad, XboxBtHid,
+    }
 
     // bit-index (orden GamepadButton) → raw button index. 11 entradas:
     // A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3. -1 = botón ausente en este layout.
@@ -82,6 +101,11 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     // no van al face-button map). Guide ausente en modo DInput.
     private static readonly int[] XdGamepadButtonMap = {
         0,  1,  2,  3,  4,  5,  8,  9, -1, 10, 11,
+    };
+    // Xbox por Bluetooth vía hid-generic: huecos en raw 2 y 5, y los triggers
+    // digitales en raw 8/9 quedan fuera del map (ya vienen por a4/a5).
+    private static readonly int[] XboxBtHidButtonMap = {
+        0,  1,  3,  4,  6,  7, 10, 11, 12, 13, 14,
     };
 
     private readonly ILogger logger;
@@ -224,6 +248,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
                 idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
                 break;
             case AxisLayout.WinXInput:
+            case AxisLayout.XboxBtHid:
                 idxLT = 4; idxRT = 5; idxRX = 2; idxRY = 3;
                 break;
             case AxisLayout.XdGamepad:
@@ -315,6 +340,21 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
 
         if (axsCount > 5
             && axsPtr[4] < Ds4LayoutThreshold
+            && axsPtr[3] >= Ds4LayoutThreshold
+            && btnCount >= XboxBtHidMinButtons)
+        {
+            layout = AxisLayout.XboxBtHid;
+            ltRangeSigned = true;
+            rtRangeSigned = true;
+            logger.Notification(
+                $"GamepadCompanion: detected XboxBtHid layout by signed LT at a4 " +
+                $"+ btnCount>={XboxBtHidMinButtons} " +
+                $"(btnCount={btnCount}, axes={axesDump})");
+            return;
+        }
+
+        if (axsCount > 5
+            && axsPtr[4] < Ds4LayoutThreshold
             && axsPtr[3] >= Ds4LayoutThreshold)
         {
             layout = AxisLayout.WinXInput;
@@ -355,6 +395,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             AxisLayout.GameSirPs4 => GameSirPs4ButtonMap,
             AxisLayout.WinXInput  => WinXInputButtonMap,
             AxisLayout.XdGamepad  => XdGamepadButtonMap,
+            AxisLayout.XboxBtHid  => XboxBtHidButtonMap,
             _                     => null,
         };
 
