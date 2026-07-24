@@ -404,6 +404,21 @@ public sealed class ConfigDialog : GuiDialog
             },
             switchBounds, "invert");
         y += SensRowH + SensRowGap;
+
+        // Swap triggers (switch)
+        var swapLabelBounds = ElementBounds
+            .Fixed(Margin, y + 6, SensLabelW, SensRowH);
+        var swapSwitchBounds = ElementBounds
+            .Fixed(Margin + SensLabelW + 8, y, 30, 30);
+        compo.AddStaticText(Lang.Get("gamepadcompanion:sens-swap-triggers"),
+                            CairoFont.WhiteSmallText(), swapLabelBounds);
+        compo.AddSwitch(v =>
+            {
+                config.SwapTriggers = v;
+                onChanged?.Invoke();
+            },
+            swapSwitchBounds, "swaptriggers");
+        y += SensRowH + SensRowGap;
     }
 
     private void AddSensitivityRow(
@@ -439,6 +454,7 @@ public sealed class ConfigDialog : GuiDialog
         SingleComposer.GetSlider("deadzone")
             .SetValues((int)(config.Deadzone * 100), 0, 50, 1, "%");
         SingleComposer.GetSwitch("invert").SetValue(config.InvertPitch);
+        SingleComposer.GetSwitch("swaptriggers").SetValue(config.SwapTriggers);
     }
 
     private void OnTabClicked(int idx)

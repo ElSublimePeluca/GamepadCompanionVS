@@ -29,6 +29,14 @@ public readonly struct GamepadState
         RightTrigger = rightTrigger;
     }
 
+    // Copia con LT y RT intercambiados (para el swap opcional del config).
+    // Preserva el estado Disconnected: default → default.
+    public GamepadState WithSwappedTriggers()
+        => IsConnected
+           ? new GamepadState(ButtonBits, LeftStickX, LeftStickY,
+                              RightStickX, RightStickY, RightTrigger, LeftTrigger)
+           : this;
+
     public bool IsDown(GamepadButton button)
         => IsConnected && (ButtonBits & (1 << (int)button)) != 0;
 

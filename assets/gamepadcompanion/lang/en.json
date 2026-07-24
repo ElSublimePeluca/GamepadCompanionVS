@@ -20,6 +20,7 @@
     "sens-pitch": "Vertical sensitivity",
     "sens-deadzone": "Dead zone (%)",
     "sens-invert-pitch": "Invert pitch",
+    "sens-swap-triggers": "Swap triggers (LT/RT)",
     "clear-binding": "Clear binding",
     "no-results": "No results",
     "composite-title": "Action combination",

@@ -48,11 +48,13 @@ namespace GamepadCompanion.Input;
 //                 usages: raw 2 (BTN_C) y raw 5 (BTN_Z) no existen físicamente,
 //                 y raw 8/9 (BTN_TL2/TR2) son los triggers en versión digital
 //                 — los ignoramos para no duplicar los trigger axes.
-//                 Firma: mismos ejes que WinXInput (LT signed en a4, a3 no
-//                 signed) pero btnCount >= 15, contra los 14 que reporta GLFW
-//                 en Windows XInput (10 botones + 4 del hat). El device del
-//                 log traía 19 = 15 reales + 4 del hat.
-//                 axes: LX,LY,RX,RY,LT,RT (0..5) — igual a WinXInput
+//                 Firma: un trigger signed en a4, a3 no signed, pero
+//                 btnCount >= 15, contra los 14 que reporta GLFW en Windows
+//                 XInput (10 botones + 4 del hat). El device del log traía
+//                 19 = 15 reales + 4 del hat.
+//                 axes: LX,LY,RX,RY,RT,LT (0..5) — mismos índices que
+//                 WinXInput pero los triggers vienen intercambiados
+//                 (RT físico=a4, LT físico=a5), ver el switch en PollRaw.
 //                 buttons: A,B,_,X,Y,_,LB,RB,LT_btn,RT_btn,Back,Start,Guide,
 //                 L3,R3 (0..14). D-pad vía hat 0 (solo 6 axes).
 //   XdGamepad   — SHANWAN PS3-DInput "X-D GamePad" (vendor 0x2563). Modo
@@ -248,8 +250,15 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
                 idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
                 break;
             case AxisLayout.WinXInput:
-            case AxisLayout.XboxBtHid:
                 idxLT = 4; idxRT = 5; idxRX = 2; idxRY = 3;
+                break;
+            case AxisLayout.XboxBtHid:
+                // Xbox por BT reporta los triggers al revés que WinXInput: el
+                // trigger físico DERECHO cae en a4 y el IZQUIERDO en a5. En
+                // v1.5.0 se asumió el orden de WinXInput (LT=a4, RT=a5) y salían
+                // intercambiados in-game (RT interactuaba, LT rompía). Confirmado
+                // por GingeeMaestro comparando contra el layout USB (xpad).
+                idxLT = 5; idxRT = 4; idxRX = 2; idxRY = 3;
                 break;
             case AxisLayout.XdGamepad:
                 // Sin trigger axes — se leen de los botones b6/b7 abajo.
@@ -347,7 +356,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             ltRangeSigned = true;
             rtRangeSigned = true;
             logger.Notification(
-                $"GamepadCompanion: detected XboxBtHid layout by signed LT at a4 " +
+                $"GamepadCompanion: detected XboxBtHid layout by signed trigger at a4 " +
                 $"+ btnCount>={XboxBtHidMinButtons} " +
                 $"(btnCount={btnCount}, axes={axesDump})");
             return;

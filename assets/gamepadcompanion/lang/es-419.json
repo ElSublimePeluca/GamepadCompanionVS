@@ -20,6 +20,7 @@
     "sens-pitch": "Sensibilidad vertical",
     "sens-deadzone": "Dead zone (%)",
     "sens-invert-pitch": "Invertir pitch",
+    "sens-swap-triggers": "Intercambiar triggers (LT/RT)",
     "clear-binding": "Quitar binding",
     "no-results": "Sin resultados",
     "composite-title": "Combinación de acciones",

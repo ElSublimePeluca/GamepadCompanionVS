@@ -16,6 +16,13 @@ public sealed class GamepadCompanionConfig
     // bloques específicos o entidades a distancia sin overshoot.
     public float PrecisionFactor  { get; set; } = 0.3f;
 
+    // Intercambia LT ↔ RT antes de que los mappers los lean. El default (RT =
+    // atacar/romper = click izq, LT = interactuar = click der) es intencional
+    // (ver TriggerMapper), pero algunos controles reportan los ejes al revés o
+    // el usuario prefiere el reflejo invertido. Afecta triggers in-world y
+    // clicks del cursor virtual por igual.
+    public bool  SwapTriggers     { get; set; } = false;
+
     // Slots de la rueda radial. null en el array entero significa "usar
     // defaults"; null en una posición significa "slot vacío". Length 8
     // cuando está poblado. La forma del SlotConfig es plana con

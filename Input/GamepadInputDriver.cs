@@ -1,6 +1,7 @@
 using System.Linq;
 using GamepadCompanion.Gui;
 using GamepadCompanion.Toggles;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using Vintagestory.API.Client;
 
 namespace GamepadCompanion.Input;
@@ -53,6 +54,26 @@ public sealed class GamepadInputDriver
     public void OnTick(GamepadState current, GamepadState previous, float dt)
     {
         if (!current.IsConnected) return;
+
+        // Sin foco de ventana (alt-tab) no inyectamos NADA al juego ni al mouse
+        // del OS. Antes el cursor virtual seguía snapeando el mouse a la posición
+        // de VS aunque estuviera en segundo plano (reportado por ElSublimePeluca).
+        if (!IsWindowFocused())
+        {
+            triggers.Release();
+            cursor.Hide();
+            return;
+        }
+
+        // Swap opcional de triggers (config): algunos controles reportan LT/RT
+        // en orden distinto, o el usuario prefiere el reflejo invertido. Se
+        // aplica acá, antes de todos los mappers, para que afecte por igual a
+        // los triggers in-world y a los clicks del cursor virtual.
+        if (config.SwapTriggers)
+        {
+            current  = current.WithSwappedTriggers();
+            previous = previous.WithSwappedTriggers();
+        }
 
         // Con el juego pausado (menú Escape) el render — y por ende este
         // OnTick — sigue corriendo, pero escribir flags a EntityControls
@@ -128,7 +149,11 @@ public sealed class GamepadInputDriver
                 // quede pegado a la última posición del mouse físico.
                 cursor.Sync();
             }
-            cursorClicks.Apply(current, previous);
+            // Si el usuario tomó el mouse físico, no inyectamos clicks del
+            // gamepad: apuntarían a la posición (vieja) del cursor virtual.
+            // El mouse físico y sus botones manejan el dialog.
+            if (!cursor.PhysicalOverride)
+                cursorClicks.Apply(current, previous);
         }
         else
         {
@@ -179,5 +204,15 @@ public sealed class GamepadInputDriver
         return capi.Gui.OpenedGuis.Any(d =>
             d is not null && d.IsOpened() &&
             d.DialogType == EnumDialogType.Dialog);
+    }
+
+    // El contexto GL está current en el hilo de render donde corre OnTick, así
+    // que GetCurrentContext devuelve la ventana de VS. window==null (edge o
+    // headless) → asumimos foco para no romper.
+    private static unsafe bool IsWindowFocused()
+    {
+        var window = GLFW.GetCurrentContext();
+        return window == null
+            || GLFW.GetWindowAttrib(window, WindowAttributeGetBool.Focused);
     }
 }

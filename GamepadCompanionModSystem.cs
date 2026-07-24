@@ -168,6 +168,15 @@ public class GamepadCompanionModSystem : ModSystem
                 return TextCommandResult.Success($"invert pitch = {config.InvertPitch}");
             });
 
+        api.ChatCommands.Create("gpswaptriggers")
+            .WithDescription("Toggle swapping the left/right trigger assignment")
+            .HandleWith(_ =>
+            {
+                config!.SwapTriggers = !config.SwapTriggers;
+                api.StoreModConfig(config, ConfigFile);
+                return TextCommandResult.Success($"swap triggers = {config.SwapTriggers}");
+            });
+
         api.ChatCommands.Create("gpguis")
             .WithDescription("Dump LoadedGuis state (for cursor click debug)")
             .HandleWith(_ =>

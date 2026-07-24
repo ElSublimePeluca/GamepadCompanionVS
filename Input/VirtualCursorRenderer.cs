@@ -24,7 +24,10 @@ public sealed class VirtualCursorRenderer : IRenderer
 
     public void OnRenderFrame(float dt, EnumRenderStage stage)
     {
-        if (!cursor.Visible) return;
+        // PhysicalOverride: el usuario tomó el mouse físico, escondemos el cross
+        // amarillo para no mostrar dos cursores. Al retomar con el gamepad
+        // vuelve a aparecer.
+        if (!cursor.Visible || cursor.PhysicalOverride) return;
 
         // En Done el shader gui no está bound ni hay proyección
         // ortográfica activa (la engine ya hizo guiShader.Stop() +
