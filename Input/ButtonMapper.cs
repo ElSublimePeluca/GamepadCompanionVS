@@ -44,16 +44,11 @@ public sealed class ButtonMapper
 
     public void Apply(GamepadState current, GamepadState previous)
     {
-        // A → jump: el engine procesa Jump leyendo el flag de EntityControls,
-        // no por Handler. La hotkey "jump" existe en HotKeys (para que sea
-        // rebindeable desde el menú) pero su Handler es null. Seteamos el flag
-        // mientras A está presionado; el OR con el valor previo respeta lo que
-        // haya seteado el teclado en el mismo tick.
-        if (current.IsDown(GamepadButton.A))
-        {
-            var controls = capi.World?.Player?.Entity?.Controls;
-            if (controls is not null) controls.Jump = true;
-        }
+        // A → jump se proyecta en MovementMapper junto con WASD, escribiendo a
+        // ClientMain.KeyboardState del hotkey "jump". Antes se seteaba acá el
+        // flag EntityControls.Jump: movía al jugador local pero nunca llegaba
+        // al servidor, así que el salto no se animaba para los demás. Sigue
+        // siendo unconditional (no se pierde aunque remapees A a otra cosa).
 
         // Edge-press: cada botón ejecuta el override del user, o si no hay,
         // su default hardcoded.

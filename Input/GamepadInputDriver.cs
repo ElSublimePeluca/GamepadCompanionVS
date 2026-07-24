@@ -53,13 +53,18 @@ public sealed class GamepadInputDriver
 
     public void OnTick(GamepadState current, GamepadState previous, float dt)
     {
-        if (!current.IsConnected) return;
+        if (!current.IsConnected)
+        {
+            movement.Release();
+            return;
+        }
 
         // Sin foco de ventana (alt-tab) no inyectamos NADA al juego ni al mouse
         // del OS. Antes el cursor virtual seguía snapeando el mouse a la posición
         // de VS aunque estuviera en segundo plano (reportado por ElSublimePeluca).
         if (!IsWindowFocused())
         {
+            movement.Release();
             triggers.Release();
             cursor.Hide();
             return;
@@ -91,7 +96,19 @@ public sealed class GamepadInputDriver
         // se elige slot es UX estándar.
         radial.OnGamepadTick(current, previous);
 
-        if (!paused) movement.Apply(current);
+        bool vkbdOpen     = virtualKeyboard is not null && virtualKeyboard.IsOpened();
+        bool cursorActive = AnyModalDialogOpen();
+
+        // Movement se proyecta SIEMPRE, aunque el resultado sea "ninguna tecla":
+        // MovementMapper escribe a ClientMain.KeyboardState, que es persistente,
+        // así que saltearse un tick dejaría la última tecla sticky. Caminar
+        // mientras se elige slot en el radial es UX estándar y se mantiene; el
+        // salto sí se corta cuando A significa otra cosa (teclado virtual) o
+        // cuando el engine no lo aceptaría igual (dialog abierto).
+        movement.Apply(current,
+                       allowMove: !paused && !vkbdOpen,
+                       allowJump: !paused && !vkbdOpen && !radial.IsActive
+                                  && !cursorActive);
 
         if (radial.IsActive)
         {
@@ -104,11 +121,11 @@ public sealed class GamepadInputDriver
         // navega, A presiona la tecla seleccionada, B cierra. Skipeamos
         // cursor/camera/triggers/buttons para que ningún otro mapper
         // pise el input.
-        if (virtualKeyboard is not null && virtualKeyboard.IsOpened())
+        if (vkbdOpen)
         {
             triggers.Release();
             cursor.Hide();
-            virtualKeyboard.OnGamepadTick(current, previous);
+            virtualKeyboard!.OnGamepadTick(current, previous);
             return;
         }
 
@@ -117,8 +134,7 @@ public sealed class GamepadInputDriver
         // RB suelto = modo slot: DPad salta cursor por pasos del tamaño de un
         // slot de inventario, ideal para navegar inventario/cofres sin arrastrar
         // con el stick. RT/LT siguen clickeando en ambos modos.
-        bool cursorActive = AnyModalDialogOpen();
-        bool smoothMode   = current.IsDown(GamepadButton.RightBumper);
+        bool smoothMode = current.IsDown(GamepadButton.RightBumper);
         if (cursorActive)
         {
             // Si abrimos la dialog con LT mid-press (ej. cofre), el
