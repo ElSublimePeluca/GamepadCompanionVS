@@ -45,29 +45,76 @@ public sealed class TriggerMapper
         var mouse = client.InWorldMouseState;
         if (mouse is null) return;
 
-        // Sin grab no inyectamos clicks in-world (rompería bloques detrás del
-        // inventario). Soltamos cualquier flag pegado del press anterior.
-        if (!capi.Input.MouseGrabbed)
+        bool rtNow  = current.RightTrigger  > Threshold;
+        bool rtPrev = previous.RightTrigger > Threshold;
+        bool ltNow  = current.LeftTrigger   > Threshold;
+        bool ltPrev = previous.LeftTrigger  > Threshold;
+
+        // "Left trigger curse" (trace qdjXAamm): la tecla de togglemousecontrol
+        // puede quedar latcheada en ClientMain.KeyboardState — OnFocusChanged
+        // limpia el mouse state al perder foco pero NO el teclado, así que el
+        // KeyUp que se comió un alt-tab / overlay de Steam no llega nunca.
+        // UpdateFreeMouse la XORea cada frame → MouseGrabbed=false permanente
+        // sin ningún dialog visible, y los triggers eran la única víctima
+        // (cámara y movimiento van por otros canales). Si el usuario aprieta
+        // un trigger en ese estado, es inequívoco que quiere la acción
+        // in-world: soltamos la tecla fantasma y el grab vuelve solo. Solo en
+        // press edge para no pelearle a un usuario de teclado que sostiene la
+        // tecla a propósito (ese no está a la vez apretando LT del gamepad).
+        if ((rtNow && !rtPrev) || (ltNow && !ltPrev))
+        {
+            TryReclaimMouseGrab(client);
+        }
+
+        // Mismo gate que SystemMouseInWorldInteractions: el engine procesa
+        // interacciones con MouseGrabbed *o* mouseWorldInteractAnyway (mouse
+        // libre sin ningún Dialog que prefiera ungrabbed). Gatear solo por
+        // MouseGrabbed nos dejaba más estrictos que el engine: en el estado
+        // free-mouse el click físico interactuaba pero el gamepad no. Con
+        // inventario/cofre abierto ambos flags son false → seguimos sin
+        // romper bloques detrás de la GUI, igual que antes.
+        if (!capi.Input.MouseGrabbed && !client.mouseWorldInteractAnyway)
         {
             ReleaseInto(mouse);
             return;
         }
 
-        bool rtNow  = current.RightTrigger  > Threshold;
-        bool rtPrev = previous.RightTrigger > Threshold;
         if (rtNow != rtPrev)
         {
             mouse.Left = rtNow;
             wroteLeft = rtNow;
         }
 
-        bool ltNow  = current.LeftTrigger  > Threshold;
-        bool ltPrev = previous.LeftTrigger > Threshold;
         if (ltNow != ltPrev)
         {
             mouse.Right = ltNow;
             wroteRight = ltNow;
         }
+    }
+
+    // El heal del curse: solo actúa con el mouse ungrabbed sin dialogs
+    // abiertos (la firma exacta del estado fantasma — con un dialog real el
+    // ungrab es legítimo) y con la tecla free-mouse figurando presionada.
+    // Limpia state y raw: ambos quedan latcheados juntos cuando el KeyUp se
+    // pierde, y MovementMapper ORea contra raw así que un raw pegado
+    // resucitaría el estado que acabamos de limpiar.
+    private void TryReclaimMouseGrab(ClientMain client)
+    {
+        if (capi.Input.MouseGrabbed || client.DialogsOpened > 0) return;
+
+        int code = capi.Input.GetHotKeyByCode("togglemousecontrol")
+            ?.CurrentMapping?.KeyCode ?? -1;
+        var state = client.KeyboardState;
+        var raw   = client.KeyboardStateRaw;
+        if (state is null || code < 0 || code >= state.Length) return;
+        if (!state[code]) return;
+
+        state[code] = false;
+        if (raw is not null && code < raw.Length) raw[code] = false;
+        capi.Logger.Notification(
+            "GamepadCompanion: trigger pressed while mouse was ungrabbed with " +
+            "no dialog open and the free-mouse key latched in KeyboardState — " +
+            "released the key to reclaim mouse grab");
     }
 
     // Para que el driver lo llame en branches donde Apply se saltea (radial,

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using GamepadCompanion.Toggles;
 using Vintagestory.API.Client;
+using Vintagestory.Client.NoObf;
 
 namespace GamepadCompanion.Input;
 
@@ -24,6 +25,7 @@ public sealed class InputTracer
     private readonly ICoreClientAPI capi;
     private readonly IGamepadProvider gamepad;
     private readonly ToggleManager toggles;
+    private readonly VirtualCursor cursor;
 
     private long endTimestamp;
     private long startTimestamp;
@@ -33,11 +35,12 @@ public sealed class InputTracer
         && Stopwatch.GetTimestamp() < endTimestamp;
 
     public InputTracer(ICoreClientAPI capi, IGamepadProvider gamepad,
-                       ToggleManager toggles)
+                       ToggleManager toggles, VirtualCursor cursor)
     {
         this.capi = capi;
         this.gamepad = gamepad;
         this.toggles = toggles;
+        this.cursor = cursor;
     }
 
     // Devuelve la duración efectiva (clampeada). Si ya había trace corriendo,
@@ -138,7 +141,60 @@ public sealed class InputTracer
                 .Append("/rt").Append(controls.Right    ? '1' : '0');
         }
 
+        AppendEngineState(line, controls);
+
         capi.Logger.Notification(line.ToString());
+    }
+
+    // Estado del engine que gatea los triggers. La v1 del tracer era ciega acá
+    // y el "left trigger curse" (trace qdjXAamm) vivía justo en esta zona: el
+    // mod leía LT=1.00 perfecto pero la interacción nunca salía. grab/anyw es
+    // el gate real de SystemMouseInWorldInteractions; dlg el contador de
+    // Dialog-type que ungrabea el mouse; fmk la tecla togglemousecontrol
+    // (state+raw) que latcheada mata el grab sin dialog visible; imw lo que
+    // efectivamente escribimos en InWorldMouseState; hand el HandUse que
+    // también bloquea interacciones si queda colgado.
+    private void AppendEngineState(StringBuilder line,
+                                   Vintagestory.API.Common.EntityControls? controls)
+    {
+        if (capi.World is not ClientMain client)
+        {
+            line.Append(" eng=NULL");
+            return;
+        }
+
+        int fmkCode = capi.Input.GetHotKeyByCode("togglemousecontrol")
+            ?.CurrentMapping?.KeyCode ?? -1;
+        var ks    = client.KeyboardState;
+        var ksRaw = client.KeyboardStateRaw;
+        bool fmkState = ks    is not null && fmkCode >= 0
+            && fmkCode < ks.Length    && ks[fmkCode];
+        bool fmkRaw   = ksRaw is not null && fmkCode >= 0
+            && fmkCode < ksRaw.Length && ksRaw[fmkCode];
+
+        line.Append(" eng=grab").Append(capi.Input.MouseGrabbed ? '1' : '0')
+            .Append("/anyw").Append(client.mouseWorldInteractAnyway ? '1' : '0')
+            .Append("/dlg").Append(client.DialogsOpened)
+            .Append("/fmk").Append(fmkState ? '1' : '0').Append(fmkRaw ? '1' : '0')
+            .Append("/imw").Append(client.InWorldMouseState?.Left  == true ? 'L' : '-')
+                           .Append(client.InWorldMouseState?.Right == true ? 'R' : '-')
+            .Append("/hand=").Append(controls?.HandUse.ToString() ?? "?")
+            .Append("/paus").Append(capi.IsGamePaused ? '1' : '0');
+
+        // Nombres de los Dialog-type abiertos (los que ungrabean el mouse): si
+        // el curse resulta ser un dialog fantasma, esto lo nombra. "!" = está
+        // en la lista pero IsOpened()==false (estado inconsistente, leak).
+        if (client.DialogsOpened > 0)
+        {
+            line.Append("/dlgs=").Append(string.Join("+",
+                capi.Gui.OpenedGuis
+                    .Where(d => d is not null
+                             && d.DialogType == EnumDialogType.Dialog)
+                    .Select(d => d.GetType().Name + (d.IsOpened() ? "" : "!"))));
+        }
+
+        line.Append(" cur=v").Append(cursor.Visible ? '1' : '0')
+            .Append("/o").Append(cursor.PhysicalOverride ? '1' : '0');
     }
 
     private static string FormatMappedButtons(ushort bits)
