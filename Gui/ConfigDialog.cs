@@ -57,10 +57,13 @@ public sealed class ConfigDialog : GuiDialog
     private int currentTab = TabWheel;
 
     // En el picker que muestra ConfigDialog para elegir la acción de un
-    // slot, agregamos dos entries virtuales después de "ninguno":
+    // slot, agregamos tres entries virtuales después de "ninguno":
     //   - idx 1: Combinación (abre CompositeBuilderDialog)
-    //   - idx 2: Tecla individual (abre KeyCaptureDialog)
-    // Los base entries (hotkey/dialog/builtin) empiezan en idx 3.
+    //   - idx 2: Tecla individual (abre KeyCaptureDialog, tap)
+    //   - idx 3: Mantener tecla (abre KeyCaptureDialog en modo hold)
+    // Los base entries (hotkey/dialog/builtin) empiezan en idx 4.
+    // "Mantener tecla" se ofrece también en la rueda por simetría de índices,
+    // aunque ahí un slot no tiene edge de release y degrada a tap.
     // El builder de combinaciones recibe solo los base — no se anidan
     // composites ni se anidan key presses.
     // Sin emojis porque la fuente Cairo no tiene glifos extendidos.
@@ -68,7 +71,9 @@ public sealed class ConfigDialog : GuiDialog
         Lang.Get("gamepadcompanion:picker-composite-entry");
     private static string KeyPressEntryLabel =>
         Lang.Get("gamepadcompanion:picker-keypress-entry");
-    private const int MetaEntryCount = 2; // composite + keypress
+    private static string HoldKeyEntryLabel =>
+        Lang.Get("gamepadcompanion:picker-holdkey-entry");
+    private const int MetaEntryCount = 3; // composite + keypress + holdkey
 
     private enum EntryKind { None, HotKey, OpenDialog, Builtin }
     private string[] entryCodes       = Array.Empty<string>();
@@ -324,7 +329,7 @@ public sealed class ConfigDialog : GuiDialog
             OpenButtonCompositeBuilder(btn);
             return;
         }
-        if (pickerIdx == 2)
+        if (pickerIdx == 2 || pickerIdx == 3)
         {
             OpenKeyCapture(action =>
             {
@@ -332,7 +337,7 @@ public sealed class ConfigDialog : GuiDialog
                 buttonBindings.Set(btn, action);
                 onChanged?.Invoke();
                 Compose();
-            });
+            }, holdMode: pickerIdx == 3);
             return;
         }
         int baseIdx = pickerIdx - MetaEntryCount;
@@ -364,6 +369,7 @@ public sealed class ConfigDialog : GuiDialog
         var action = buttonBindings[btn];
         if (action is CompositeAction) return 1;
         if (action is KeyPressAction) return 2;
+        if (action is HoldKeyAction) return 3;
         int baseIdx = action is null ? 0 : BaseIndexOfAction(action);
         return baseIdx == 0 ? 0 : baseIdx + MetaEntryCount;
     }
@@ -486,12 +492,14 @@ public sealed class ConfigDialog : GuiDialog
         arr[0] = entryNames[0];               // "ninguno"
         arr[1] = CompositeEntryLabel;
         arr[2] = KeyPressEntryLabel;
+        arr[3] = HoldKeyEntryLabel;
         for (int i = 1; i < entryNames.Length; i++)
             arr[i + MetaEntryCount] = entryNames[i];
         return arr;
     }
 
-    // Traduce: pickerIdx 0=none, 1=composite, 2=keypress, 3+ = base[idx-2].
+    // Traduce: pickerIdx 0=none, 1=composite, 2=keypress, 3=holdkey,
+    // 4+ = base[idx-3].
     private void ApplyPick(int slot, int pickerIdx)
     {
         if (pickerIdx <= 0)
@@ -506,7 +514,7 @@ public sealed class ConfigDialog : GuiDialog
             OpenCompositeBuilder(slot);
             return;
         }
-        if (pickerIdx == 2)
+        if (pickerIdx == 2 || pickerIdx == 3)
         {
             OpenKeyCapture(action =>
             {
@@ -514,7 +522,7 @@ public sealed class ConfigDialog : GuiDialog
                 bindings.Set(slot, action);
                 onChanged?.Invoke();
                 Compose();
-            });
+            }, holdMode: pickerIdx == 3);
             return;
         }
         int baseIdx = pickerIdx - MetaEntryCount;
@@ -523,9 +531,10 @@ public sealed class ConfigDialog : GuiDialog
         Compose();
     }
 
-    private void OpenKeyCapture(Action<KeyPressAction?> onCaptured)
+    private void OpenKeyCapture(Action<IGameAction?> onCaptured,
+                                bool holdMode = false)
     {
-        new KeyCaptureDialog(capi, onCaptured).TryOpen();
+        new KeyCaptureDialog(capi, onCaptured, holdMode).TryOpen();
     }
 
     private void OpenCompositeBuilder(int slot)
@@ -596,6 +605,7 @@ public sealed class ConfigDialog : GuiDialog
         var action = bindings[slot];
         if (action is CompositeAction) return 1;
         if (action is KeyPressAction) return 2;
+        if (action is HoldKeyAction) return 3;
         int baseIdx = action is null ? 0 : BaseIndexOfAction(action);
         return baseIdx == 0 ? 0 : baseIdx + MetaEntryCount;
     }

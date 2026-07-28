@@ -239,6 +239,9 @@ public class GamepadCompanionModSystem : ModSystem
         toggleHud?.TryClose();
         toggleHud?.Dispose();
         toggleHud = null;
+        // Bindings de "mantener tecla": soltar antes de tirar el driver, si no
+        // el KeyUp nunca sale y la tecla queda apretada en KeyboardState.
+        driver?.Buttons.ReleaseHolds();
         driver?.Radial.TryClose();
         driver?.Radial.Dispose();
         gamepad?.Dispose();

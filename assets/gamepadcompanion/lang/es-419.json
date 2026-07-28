@@ -13,6 +13,7 @@
     "entry-empty": "— (vacío)",
     "picker-composite-entry": "[Combinar varias acciones...]",
     "picker-keypress-entry": "[Asignar una tecla individual...]",
+    "picker-holdkey-entry": "[Asignar una tecla a mantener...]",
     "restore-defaults": "Restaurar predeterminados",
     "restore-default": "Restaurar predeterminado",
     "button-default": "— predeterminado —",
@@ -26,6 +27,8 @@
     "composite-title": "Combinación de acciones",
     "capture-key-title": "Capturar tecla",
     "capture-key-prompt": "Presioná la tecla a asignar...",
+    "capture-hold-title": "Capturar tecla a mantener",
+    "capture-hold-prompt": "Presioná la tecla que se va a mantener mientras el botón esté apretado...",
     "virtual-keyboard": "Teclado virtual",
     "vkb-space": "Espacio",
     "vkb-backspace": "Borrar",
@@ -42,6 +45,7 @@
     "slot-handbook": "Manual",
     "slot-configure": "Configurar",
     "keypress-label": "Tecla {0}",
+    "holdkey-label": "Mantener {0}",
     "key-g-sit": "Tecla G (sentarse)",
     "hotkey-open-config": "GamepadCompanion: abrir configuración"
 }

@@ -56,6 +56,9 @@ internal static class SlotConfigActions
                 // Ídem: el label "Tecla X" se regenera localizado.
                 return new KeyPressAction(kc,
                     cfg.CtrlPressed, cfg.ShiftPressed, cfg.AltPressed);
+            case "holdkey" when cfg.KeyCode is int hkc:
+                return new HoldKeyAction(hkc,
+                    cfg.CtrlPressed, cfg.ShiftPressed, cfg.AltPressed);
             case "composite" when cfg.Children is not null:
                 var children = new List<IGameAction>();
                 foreach (var sub in cfg.Children)

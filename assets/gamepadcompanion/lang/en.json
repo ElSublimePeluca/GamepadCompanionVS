@@ -13,6 +13,7 @@
     "entry-empty": "— (empty)",
     "picker-composite-entry": "[Combine multiple actions...]",
     "picker-keypress-entry": "[Assign a single key...]",
+    "picker-holdkey-entry": "[Assign a key to hold down...]",
     "restore-defaults": "Restore defaults",
     "restore-default": "Restore default",
     "button-default": "— default —",
@@ -26,6 +27,8 @@
     "composite-title": "Action combination",
     "capture-key-title": "Capture key",
     "capture-key-prompt": "Press the key to assign...",
+    "capture-hold-title": "Capture key to hold",
+    "capture-hold-prompt": "Press the key to hold while the button is held...",
     "virtual-keyboard": "Virtual keyboard",
     "vkb-space": "Space",
     "vkb-backspace": "Backspace",
@@ -42,6 +45,7 @@
     "slot-handbook": "Handbook",
     "slot-configure": "Configure",
     "keypress-label": "Key {0}",
+    "holdkey-label": "Hold {0}",
     "key-g-sit": "G key (sit)",
     "hotkey-open-config": "GamepadCompanion: open settings"
 }

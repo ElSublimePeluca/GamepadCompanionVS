@@ -7,9 +7,19 @@ using Vintagestory.API.Config;
 namespace GamepadCompanion.Gui;
 
 // Dialog modal mínimo que captura el próximo evento de teclado del
-// usuario y construye una KeyPressAction con la combinación capturada
+// usuario y construye la acción con la combinación capturada
 // (incluyendo modificadores Ctrl/Shift/Alt). Cancela con Escape o el
 // botón "Cancelar"; en ambos casos onPicked recibe null.
+//
+// Modo hold (holdMode: true): la acción resultante es una HoldKeyAction —
+// la tecla queda apretada mientras el botón del gamepad esté apretado.
+//
+// Modificadores solos: un Ctrl/Shift/Alt suelto NO se captura en el KeyDown,
+// porque ahí todavía no sabemos si el usuario está armando "Ctrl+K" o quiere
+// el modificador pelado. Se resuelve en el KeyUp: si soltó el modificador sin
+// haber tocado ninguna otra tecla, era el modificador pelado. Sin esto no
+// había forma de asignar Alt, que es lo que RKN Crafting usa de modificador
+// por default (reportado por pngwn).
 public sealed class KeyCaptureDialog : GuiDialog
 {
     private const double DialogW = 360;
@@ -19,8 +29,11 @@ public sealed class KeyCaptureDialog : GuiDialog
     private const double BodyH   = 40;
     private const double FooterH = 36;
 
-    private readonly Action<KeyPressAction?> onPicked;
+    private readonly Action<IGameAction?> onPicked;
+    private readonly bool holdMode;
     private bool captured;
+    // Modificador que vimos bajar y todavía no resolvimos. -1 = ninguno.
+    private int pendingModifier = -1;
 
     public override string ToggleKeyCombinationCode => null!;
     public override double DrawOrder => 0.7;
@@ -28,9 +41,11 @@ public sealed class KeyCaptureDialog : GuiDialog
     public override bool CaptureAllInputs() => true;
 
     public KeyCaptureDialog(ICoreClientAPI capi,
-                            Action<KeyPressAction?> onPicked) : base(capi)
+                            Action<IGameAction?> onPicked,
+                            bool holdMode = false) : base(capi)
     {
         this.onPicked = onPicked;
+        this.holdMode = holdMode;
         Compose();
     }
 
@@ -51,10 +66,14 @@ public sealed class KeyCaptureDialog : GuiDialog
         SingleComposer = capi.Gui
             .CreateCompo("gpcompanion-keycap", dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar(Lang.Get("gamepadcompanion:capture-key-title"),
+            .AddDialogTitleBar(Lang.Get(holdMode
+                                   ? "gamepadcompanion:capture-hold-title"
+                                   : "gamepadcompanion:capture-key-title"),
                                OnCancel, bounds: titleBarBounds)
             .BeginChildElements(bgBounds)
-            .AddStaticText(Lang.Get("gamepadcompanion:capture-key-prompt"),
+            .AddStaticText(Lang.Get(holdMode
+                               ? "gamepadcompanion:capture-hold-prompt"
+                               : "gamepadcompanion:capture-key-prompt"),
                            CairoFont.WhiteSmallText(),
                            EnumTextOrientation.Center,
                            bodyBounds)
@@ -77,22 +96,40 @@ public sealed class KeyCaptureDialog : GuiDialog
             return;
         }
 
-        // Ignorar pulsaciones de modificadores solos (Ctrl/Shift/Alt):
-        // el user querrá una tecla "real" y los modificadores son
-        // detectados via los flags del KeyEvent al apretar la real.
+        // Un modificador solo no se resuelve todavía: puede ser el prefijo de
+        // "Ctrl+K" o el binding en sí. Lo decide OnKeyUp.
         if (IsModifierKey(args.KeyCode))
         {
             args.Handled = true;
+            pendingModifier = args.KeyCode;
             return;
         }
 
-        captured = true;
+        pendingModifier = -1;
+        Capture(args.KeyCode,
+                args.CtrlPressed, args.ShiftPressed, args.AltPressed);
         args.Handled = true;
-        var action = new KeyPressAction(
-            args.KeyCode,
-            args.CtrlPressed,
-            args.ShiftPressed,
-            args.AltPressed);
+    }
+
+    public override void OnKeyUp(KeyEvent args)
+    {
+        if (captured) return;
+        if (args.KeyCode != pendingModifier) return;
+
+        // Soltó el modificador sin haber tocado otra tecla → era el binding.
+        // Los flags del propio KeyEvent no se re-envían: la tecla capturada YA
+        // es el modificador, sumarlo como flag lo duplicaría.
+        args.Handled = true;
+        pendingModifier = -1;
+        Capture(args.KeyCode, ctrl: false, shift: false, alt: false);
+    }
+
+    private void Capture(int keyCode, bool ctrl, bool shift, bool alt)
+    {
+        captured = true;
+        IGameAction action = holdMode
+            ? new HoldKeyAction(keyCode, ctrl, shift, alt)
+            : new KeyPressAction(keyCode, ctrl, shift, alt);
         onPicked(action);
         TryClose();
     }

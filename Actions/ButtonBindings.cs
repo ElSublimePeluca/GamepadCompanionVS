@@ -101,6 +101,16 @@ public sealed class ButtonBindings
                        AltPressed = kp.AltPressed,
                        Label = kp.Label,
                    },
+            HoldKeyAction hd
+                => new SlotConfig
+                   {
+                       Type = "holdkey",
+                       KeyCode = hd.KeyCode,
+                       CtrlPressed = hd.CtrlPressed,
+                       ShiftPressed = hd.ShiftPressed,
+                       AltPressed = hd.AltPressed,
+                       Label = hd.Label,
+                   },
             CompositeAction co
                 => new SlotConfig
                    {

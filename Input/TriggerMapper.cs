@@ -1,25 +1,48 @@
 using Vintagestory.API.Client;
+using Vintagestory.API.Common;
 using Vintagestory.Client.NoObf;
 
 namespace GamepadCompanion.Input;
 
 // RT → click izquierdo (atacar/romper), LT → click derecho (interactuar/colocar),
-// vía ClientMain.InWorldMouseState.Left / Right con edge-trigger.
+// vía ClientMain.UpdateMouseButtonState con edge-trigger.
 // El layout es invertido respecto al "estándar" de gamepad porque calza mejor
 // con el reflejo del usuario para esta mecánica.
 //
 // Probado y descartado: EntityControls.LeftMouseDown / RightMouseDown — esos
 // solo disparan la animación del personaje (swing del brazo) pero el sistema
-// de interacciones in-world no los lee. La fuente autoritativa es
+// de interacciones in-world no los lee. Quien consume es
 // SystemMouseInWorldInteractions, que lee de ClientMain.InWorldMouseState
 // (campo público, MouseButtonState con bool Left/Middle/Right).
 //
+// Hasta v1.7.1 escribíamos InWorldMouseState DIRECTO. Funcionaba para el
+// gameplay vanilla básico, pero se saltea los eventos MouseDown/MouseUp — y
+// tanto el engine como varios mods los usan como señal de "el click terminó":
+//
+//   - Vanilla `BlockGroundStorage` tiene un latch ESTÁTICO
+//     `IsUsingContainedBlock` que se prende al interactuar con un item
+//     contenido en ground storage (mineral, cuenco, olla, bolsa, linterna...)
+//     y cuyo ÚNICO reset es un handler suscripto a `Event.MouseUp`. Sin
+//     MouseUp el latch queda pegado y `OnBlockInteractStart` de TODO ground
+//     storage devuelve false para siempre → no se puede levantar herramientas,
+//     crisoles, moldes ni pilas del piso, mientras los bloques normales
+//     (puertas, cofres, moldes colocados) siguen andando. Ése era el "left
+//     trigger curse" de GingeeMaestro: se "arreglaba" al reiniciar el mundo
+//     porque cualquier click físico en los menús limpiaba el latch.
+//   - CombatOverhaul latchea igual su acción de ataque y solo la apaga un
+//     MouseUp físico → arma que se balancea sola.
+//
+// Por eso ahora ruteamos por `ClientMain.UpdateMouseButtonState(button, down)`,
+// que es el método público con el que el propio engine sintetiza clicks para
+// las hotkeys "primarymouse"/"secondarymouse" (SystemHotkeys): dispara
+// TriggerMouseDown/Up, los pasa por los ClientSystems y recién ahí escribe
+// InWorldMouseState. El click del gamepad queda indistinguible de uno real.
+//
 // A diferencia de los flags de movimiento (que el engine resetea cada frame y
 // se reescriben mientras el botón está apretado), InWorldMouseState es
-// persistente: lo escribe OnMouseDownRaw/OnMouseUpRaw del engine en press y
-// release. Por eso usamos edge-trigger: writing true on press, false on release.
+// persistente. Por eso usamos edge-trigger: down on press, up on release.
 //
-// Trackeamos wroteLeft/wroteRight para poder soltar los flags si perdemos el
+// Trackeamos wroteLeft/wroteRight para poder soltar los botones si perdemos el
 // "permiso" de inyectar in-world (GuiDialog modal se abre mid-press, radial,
 // teclado virtual, foco perdido). Si no, ej. LT abre un cofre → MouseGrabbed
 // pasa a false pero el engine sigue leyendo InWorldMouseState vía
@@ -42,8 +65,7 @@ public sealed class TriggerMapper
     public void Apply(GamepadState current, GamepadState previous)
     {
         if (capi.World is not ClientMain client) return;
-        var mouse = client.InWorldMouseState;
-        if (mouse is null) return;
+        if (client.InWorldMouseState is null) return;
 
         bool rtNow  = current.RightTrigger  > Threshold;
         bool rtPrev = previous.RightTrigger > Threshold;
@@ -75,21 +97,38 @@ public sealed class TriggerMapper
         // romper bloques detrás de la GUI, igual que antes.
         if (!capi.Input.MouseGrabbed && !client.mouseWorldInteractAnyway)
         {
-            ReleaseInto(mouse);
+            ReleaseInto(client);
             return;
         }
 
         if (rtNow != rtPrev)
         {
-            mouse.Left = rtNow;
+            SetButton(client, EnumMouseButton.Left, rtNow);
             wroteLeft = rtNow;
         }
 
         if (ltNow != ltPrev)
         {
-            mouse.Right = ltNow;
+            SetButton(client, EnumMouseButton.Right, ltNow);
             wroteRight = ltNow;
         }
+    }
+
+    // Click por el pipeline real del engine. En el release forzamos además el
+    // flag: si un handler de mod marca el MouseEvent como Handled,
+    // UpdateMouseButtonState retorna ANTES de limpiar InWorldMouseState y el
+    // botón quedaría trabado en true (cofre en loop). En el press no forzamos
+    // nada — que una GUI se coma el click es comportamiento correcto.
+    private static void SetButton(ClientMain client, EnumMouseButton button,
+                                  bool down)
+    {
+        client.UpdateMouseButtonState(button, down);
+        if (down) return;
+
+        var mouse = client.InWorldMouseState;
+        if (mouse is null) return;
+        if (button == EnumMouseButton.Left) mouse.Left = false;
+        else                                mouse.Right = false;
     }
 
     // El heal del curse: solo actúa con el mouse ungrabbed sin dialogs
@@ -124,14 +163,24 @@ public sealed class TriggerMapper
     public void Release()
     {
         if (capi.World is not ClientMain client) return;
-        var mouse = client.InWorldMouseState;
-        if (mouse is null) return;
-        ReleaseInto(mouse);
+        ReleaseInto(client);
     }
 
-    private void ReleaseInto(MouseButtonState mouse)
+    // El release SIEMPRE va por el engine, aunque el press haya sido comido
+    // por una GUI: un mouse real también manda el up en ese caso, y es
+    // justamente el MouseUp lo que destraba los latches de vanilla
+    // (ground storage) y de mods (CombatOverhaul).
+    private void ReleaseInto(ClientMain client)
     {
-        if (wroteLeft)  { mouse.Left  = false; wroteLeft  = false; }
-        if (wroteRight) { mouse.Right = false; wroteRight = false; }
+        if (wroteLeft)
+        {
+            SetButton(client, EnumMouseButton.Left, down: false);
+            wroteLeft = false;
+        }
+        if (wroteRight)
+        {
+            SetButton(client, EnumMouseButton.Right, down: false);
+            wroteRight = false;
+        }
     }
 }

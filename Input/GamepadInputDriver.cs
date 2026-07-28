@@ -56,6 +56,7 @@ public sealed class GamepadInputDriver
         if (!current.IsConnected)
         {
             movement.Release();
+            buttons.ReleaseHolds();
             return;
         }
 
@@ -66,6 +67,7 @@ public sealed class GamepadInputDriver
         {
             movement.Release();
             triggers.Release();
+            buttons.ReleaseHolds();
             cursor.Hide();
             return;
         }
@@ -113,6 +115,7 @@ public sealed class GamepadInputDriver
         if (radial.IsActive)
         {
             triggers.Release();
+            buttons.ReleaseHolds();
             cursor.Hide();
             return;
         }
@@ -124,6 +127,7 @@ public sealed class GamepadInputDriver
         if (vkbdOpen)
         {
             triggers.Release();
+            buttons.ReleaseHolds();
             cursor.Hide();
             virtualKeyboard!.OnGamepadTick(current, previous);
             return;

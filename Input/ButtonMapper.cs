@@ -44,6 +44,11 @@ public sealed class ButtonMapper
 
     public void Apply(GamepadState current, GamepadState previous)
     {
+        // Holds primero: son bindings "mientras esté apretado" (ej. mantener
+        // Alt para el modificador de RKN Crafting) y se manejan por edge de
+        // press Y de release, no por Execute.
+        ApplyHolds(current, previous);
+
         // A → jump se proyecta en MovementMapper junto con WASD, escribiendo a
         // ClientMain.KeyboardState del hotkey "jump". Antes se seteaba acá el
         // flag EntityControls.Jump: movía al jugador local pero nunca llegaba
@@ -92,10 +97,55 @@ public sealed class ButtonMapper
         var userBinding = Bindings[btn];
         if (userBinding is not null)
         {
+            // Los holdables ya los maneja ApplyHolds — llamar Execute acá
+            // sería un tap extra en cada press.
+            if (userBinding is IHoldableAction) return;
             userBinding.Execute(capi);
             return;
         }
         defaultBehavior?.Invoke();
+    }
+
+    // Instancia que efectivamente apretamos por botón — no alcanza con mirar
+    // Bindings al soltar: el usuario puede reasignar el botón (o recargarse el
+    // config entero) con la tecla apretada, y ahí la instancia vieja es la
+    // única que sabe que tiene que soltar.
+    private readonly System.Collections.Generic.Dictionary<GamepadButton,
+        IHoldableAction> heldByButton = new();
+
+    private void ApplyHolds(GamepadState current, GamepadState previous)
+    {
+        foreach (var btn in ButtonBindings.Configurable)
+        {
+            var binding = Bindings[btn] as IHoldableAction;
+            bool now = current.IsDown(btn);
+
+            if (heldByButton.TryGetValue(btn, out var active))
+            {
+                if (now && ReferenceEquals(active, binding)) continue;
+                active.ReleaseHold(capi);
+                heldByButton.Remove(btn);
+                // Si el binding cambió con el botón todavía apretado, el nuevo
+                // recién arranca en el próximo press edge — no lo apretamos
+                // acá para no heredar una pulsación que no fue suya.
+                continue;
+            }
+
+            if (binding is null || !now || previous.IsDown(btn)) continue;
+            binding.Press(capi);
+            heldByButton[btn] = binding;
+        }
+    }
+
+    // Soltar todo lo que esté siendo mantenido. Lo llama el driver en cada
+    // camino donde deja de procesar botones (gamepad desconectado, ventana sin
+    // foco, radial abierto, teclado virtual) y el ModSystem al descargarse:
+    // sin esto el edge de release se perdería y la tecla quedaría latcheada.
+    public void ReleaseHolds()
+    {
+        if (heldByButton.Count == 0) return;
+        foreach (var action in heldByButton.Values) action.ReleaseHold(capi);
+        heldByButton.Clear();
     }
 
     // DefaultB redirige al builtin "dropOrDismiss" — misma lógica que la

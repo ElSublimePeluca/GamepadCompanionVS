@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using GamepadCompanion.Toggles;
 using Vintagestory.API.Client;
@@ -195,6 +196,58 @@ public sealed class InputTracer
 
         line.Append(" cur=v").Append(cursor.Visible ? '1' : '0')
             .Append("/o").Append(cursor.PhysicalOverride ? '1' : '0');
+
+        AppendInteractionContext(line, client, controls);
+    }
+
+    // Lo que decide SystemMouseInWorldInteractions.HandleMouseInteractions*
+    // además del estado de mouse: sin bloque apuntado la rama de bloques ni
+    // corre, y con la mano ocupada / ShiftKey prendido el engine prioriza
+    // otras acciones (colocar, usar item) antes que interactuar. El trace de
+    // v1.7.1 era ciego acá: mostraba imw-R perfecto sin poder explicar por qué
+    // no pasaba nada. `gs` es el latch estático de ground storage de vanilla
+    // (BlockGroundStorage.IsUsingContainedBlock), que solo se limpia con un
+    // MouseUp — si sale gs1, todo ground storage está bloqueado.
+    private void AppendInteractionContext(
+        StringBuilder line, ClientMain client,
+        Vintagestory.API.Common.EntityControls? controls)
+    {
+        var sel = capi.World?.Player?.CurrentBlockSelection;
+        line.Append(" sel=")
+            .Append(sel?.Block?.Code?.ToShortString() ?? "-");
+
+        var slot = capi.World?.Player?.InventoryManager?.ActiveHotbarSlot;
+        line.Append(" slot=")
+            .Append(slot?.Itemstack?.Collectible?.Code?.ToShortString()
+                    ?? "empty");
+
+        line.Append(" mod=c").Append(controls?.CtrlKey  == true ? '1' : '0')
+            .Append("/s").Append(controls?.ShiftKey == true ? '1' : '0');
+
+        line.Append(" gs").Append(GroundStorageLatched() switch
+        {
+            true  => '1',
+            false => '0',
+            null  => '?',
+        });
+    }
+
+    // Reflexión: el tipo vive en VSSurvivalMod, contra el que no linkeamos.
+    // Cacheamos el FieldInfo (o el fallo) para no pagar el lookup por frame.
+    private static FieldInfo? gsLatchField;
+    private static bool gsLatchResolved;
+
+    private static bool? GroundStorageLatched()
+    {
+        if (!gsLatchResolved)
+        {
+            gsLatchResolved = true;
+            gsLatchField = Type
+                .GetType("Vintagestory.GameContent.BlockGroundStorage, VSSurvivalMod")
+                ?.GetField("IsUsingContainedBlock",
+                           BindingFlags.Public | BindingFlags.Static);
+        }
+        return gsLatchField?.GetValue(null) as bool?;
     }
 
     private static string FormatMappedButtons(ushort bits)
