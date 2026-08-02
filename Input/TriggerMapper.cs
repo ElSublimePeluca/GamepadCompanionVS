@@ -1,3 +1,4 @@
+using OpenTK.Windowing.GraphicsLibraryFramework;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.Client.NoObf;
@@ -54,12 +55,14 @@ public sealed class TriggerMapper
     private const float Threshold = 0.5f;
 
     private readonly ICoreClientAPI capi;
+    private readonly ButtonMapper buttons;
     private bool wroteLeft;
     private bool wroteRight;
 
-    public TriggerMapper(ICoreClientAPI capi)
+    public TriggerMapper(ICoreClientAPI capi, ButtonMapper buttons)
     {
         this.capi = capi;
+        this.buttons = buttons;
     }
 
     public void Apply(GamepadState current, GamepadState previous)
@@ -79,10 +82,11 @@ public sealed class TriggerMapper
         // UpdateFreeMouse la XORea cada frame → MouseGrabbed=false permanente
         // sin ningún dialog visible, y los triggers eran la única víctima
         // (cámara y movimiento van por otros canales). Si el usuario aprieta
-        // un trigger en ese estado, es inequívoco que quiere la acción
-        // in-world: soltamos la tecla fantasma y el grab vuelve solo. Solo en
-        // press edge para no pelearle a un usuario de teclado que sostiene la
-        // tecla a propósito (ese no está a la vez apretando LT del gamepad).
+        // un trigger en ese estado, soltamos la tecla fantasma y el grab
+        // vuelve solo. Solo en press edge, y solo si la tecla no tiene dueño
+        // (ver TryReclaimMouseGrab): "trigger apretado con el mouse libre" NO
+        // implica fantasma — mantener la tecla free-mouse mientras se clickea
+        // es un flujo legítimo y frecuente.
         if ((rtNow && !rtPrev) || (ltNow && !ltPrev))
         {
             TryReclaimMouseGrab(client);
@@ -137,6 +141,24 @@ public sealed class TriggerMapper
     // Limpia state y raw: ambos quedan latcheados juntos cuando el KeyUp se
     // pierde, y MovementMapper ORea contra raw así que un raw pegado
     // resucitaría el estado que acabamos de limpiar.
+    //
+    // Una tecla con DUEÑO no es un fantasma. Dos dueños posibles:
+    //  1) Nosotros. El default de togglemousecontrol es GlKeys.AltLeft (5) —
+    //     exactamente el keycode que RKN Crafting registra de modificador
+    //     (rkncrafting.start). "Mantener Alt en A + LT para craftear" caía
+    //     entonces justo en la firma del heal: el press de LT le borraba el
+    //     Alt del KeyboardState un instante antes de que
+    //     SystemMouseInWorldInteractions llegara a OnBlockInteractStart, y RKN
+    //     — que lo lee con IsHotKeyPressed, o sea ClientMain.KeyboardState —
+    //     veía un click derecho pelado. Reportado por pngwn: con teclado y
+    //     mouse andaba, con el gamepad no. v1.8.0 (HoldKeyAction) creó el
+    //     caso; v1.7.1 escribió el heal cuando todavía no existía.
+    //  2) Un teclado físico: el usuario sostiene la tecla a mano mientras
+    //     aprieta LT del gamepad. El comentario de v1.7.1 asumía que ese
+    //     usuario no existía; RKN es justamente el flujo que lo crea.
+    // Mirar `raw` no distingue: cuando el KeyUp se pierde, state y raw quedan
+    // latcheados juntos. GLFW sí, porque el fantasma es literalmente "el
+    // engine cree que está apretada y el OS dice que no".
     private void TryReclaimMouseGrab(ClientMain client)
     {
         if (capi.Input.MouseGrabbed || client.DialogsOpened > 0) return;
@@ -147,6 +169,8 @@ public sealed class TriggerMapper
         var raw   = client.KeyboardStateRaw;
         if (state is null || code < 0 || code >= state.Length) return;
         if (!state[code]) return;
+        if (buttons.IsHoldingKeyCode(code)) return;
+        if (IsPhysicallyDown(code)) return;
 
         state[code] = false;
         if (raw is not null && code < raw.Length) raw[code] = false;
@@ -154,6 +178,22 @@ public sealed class TriggerMapper
             "GamepadCompanion: trigger pressed while mouse was ungrabbed with " +
             "no dialog open and the free-mouse key latched in KeyboardState — " +
             "released the key to reclaim mouse grab");
+    }
+
+    // ¿El OS reporta esta tecla apretada? KeyConverter.GlKeysToNew traduce
+    // GlKeys → el enum Keys de GLFW (-1 si no hay equivalente). Sin ventana
+    // (headless / contexto no current) devolvemos false y dejamos que decida
+    // el resto del heal, igual que hace IsWindowFocused en el driver.
+    private static unsafe bool IsPhysicallyDown(int glKeyCode)
+    {
+        if (glKeyCode < 0 || glKeyCode >= KeyConverter.GlKeysToNew.Length)
+            return false;
+        int glfwKey = KeyConverter.GlKeysToNew[glKeyCode];
+        if (glfwKey < 0) return false;
+
+        var window = GLFW.GetCurrentContext();
+        if (window == null) return false;
+        return GLFW.GetKey(window, (Keys)glfwKey) == InputAction.Press;
     }
 
     // Para que el driver lo llame en branches donde Apply se saltea (radial,

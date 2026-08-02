@@ -21,4 +21,12 @@ public interface IHoldableAction
 {
     void Press(ICoreClientAPI capi);
     void ReleaseHold(ICoreClientAPI capi);
+
+    // Keycode (GlKeys) que esta acción está manteniendo apretado AHORA MISMO,
+    // o null si no sostiene ninguno. Lo consulta TriggerMapper para no "curar"
+    // como fantasma una tecla que pusimos nosotros a propósito: el default de
+    // togglemousecontrol es AltLeft, el mismo keycode que RKN Crafting usa de
+    // modificador, así que sin esto el heal del "left trigger curse" le borra
+    // el modificador al mod justo antes del click.
+    int? HeldKeyCode { get; }
 }

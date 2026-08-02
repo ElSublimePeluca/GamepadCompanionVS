@@ -35,6 +35,10 @@ public sealed class HoldKeyAction : IGameAction, IHoldableAction
 
     private bool held;
 
+    // Derivado de `held`, no de KeyCode: si Press abortó porque el mundo no era
+    // un ClientMain, la tecla nunca se apretó y no somos dueños de nada.
+    public int? HeldKeyCode => held ? KeyCode : null;
+
     public HoldKeyAction(int keyCode,
                          bool ctrl  = false,
                          bool shift = false,

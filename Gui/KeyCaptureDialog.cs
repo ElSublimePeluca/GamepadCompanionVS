@@ -127,7 +127,16 @@ public sealed class KeyCaptureDialog : GuiDialog
     private void Capture(int keyCode, bool ctrl, bool shift, bool alt)
     {
         captured = true;
-        IGameAction action = holdMode
+        // Un modificador pelado se captura SIEMPRE como hold, aunque el
+        // usuario haya entrado por "[Asignar una tecla]". Un tap de Alt/Ctrl/
+        // Shift no sirve para nada — nadie escucha su edge, todo el mundo los
+        // lee como estado durante otra acción — y las dos entradas del picker
+        // son fáciles de confundir: elegir la de tap daba exactamente el mismo
+        // síntoma que el bug de RKN Crafting (modificador ausente en el click)
+        // por una razón completamente distinta. El label resultante dice
+        // "Mantener X", así que el usuario ve qué quedó asignado.
+        bool holdIt = holdMode || IsModifierKey(keyCode);
+        IGameAction action = holdIt
             ? new HoldKeyAction(keyCode, ctrl, shift, alt)
             : new KeyPressAction(keyCode, ctrl, shift, alt);
         onPicked(action);

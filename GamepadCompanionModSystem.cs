@@ -41,7 +41,8 @@ public class GamepadCompanionModSystem : ModSystem
 
         gamepad = new GlfwGamepadProvider(api.Logger);
         driver = new GamepadInputDriver(api, config);
-        tracer = new InputTracer(api, gamepad, driver.Toggles, driver.Cursor);
+        tracer = new InputTracer(api, gamepad, driver.Toggles, driver.Cursor,
+                                 driver.Buttons);
         renderer = new GamepadRenderer(gamepad, driver, tracer);
         toggleHud = new ToggleHudOverlay(api, driver.Toggles);
 

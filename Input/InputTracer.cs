@@ -27,6 +27,7 @@ public sealed class InputTracer
     private readonly IGamepadProvider gamepad;
     private readonly ToggleManager toggles;
     private readonly VirtualCursor cursor;
+    private readonly ButtonMapper buttons;
 
     private long endTimestamp;
     private long startTimestamp;
@@ -36,12 +37,14 @@ public sealed class InputTracer
         && Stopwatch.GetTimestamp() < endTimestamp;
 
     public InputTracer(ICoreClientAPI capi, IGamepadProvider gamepad,
-                       ToggleManager toggles, VirtualCursor cursor)
+                       ToggleManager toggles, VirtualCursor cursor,
+                       ButtonMapper buttons)
     {
         this.capi = capi;
         this.gamepad = gamepad;
         this.toggles = toggles;
         this.cursor = cursor;
+        this.buttons = buttons;
     }
 
     // Devuelve la duración efectiva (clampeada). Si ya había trace corriendo,
@@ -128,6 +131,9 @@ public sealed class InputTracer
             .Append("/s").Append(toggles.ShiftActive ? '1' : '0')
             .Append("/p").Append(toggles.PrecisionActive ? '1' : '0')
             .Append(toggles.Suspended ? "/SUSP" : "");
+
+        // Teclas que estamos manteniendo por binding de "mantener tecla".
+        line.Append(" hold=").Append(buttons.DescribeHolds());
 
         // EntityControls relevantes al bug de movimiento.
         var controls = capi.World?.Player?.Entity?.Controls;

@@ -104,6 +104,26 @@ Si tu controller solo aparece como gamepad cuando Steam Input lo emula (típico 
 
 Todo configurable desde `/gpconfig`.
 
+### Mantener una tecla (mods con modificador)
+
+Varios mods usan una tecla como **modificador durante un click** (RKN Crafting: mantener Alt +
+click derecho). Un binding de tecla normal no sirve: manda down y up en el mismo frame, así que
+la tecla ya está soltada cuando llega el click.
+
+Para eso está la entrada **`[Tecla: mantener mientras el botón esté apretado]`** en el picker
+(tab Botones → botón → elegir esa entrada → apretar la tecla). La tecla queda apretada mientras
+el botón del gamepad lo esté, por el pipeline real de teclado del engine, así que un mod la ve
+igual que si viniera de un teclado físico. Un modificador pelado (Alt/Ctrl/Shift) se captura
+siempre como "mantener", aunque se entre por la entrada de tecla individual.
+
+**Receta para RKN Crafting:** bindear `AltLeft` como tecla a mantener en el botón que quieras
+(A, por ejemplo), después mantener ese botón y usar LT. No hace falta remapear nada en RKN.
+
+Ojo con un efecto de vanilla, no del mod: `AltLeft` es también la tecla **Lock/Unlock Mouse
+Cursor** del juego, así que mientras la mantengas el mouse queda libre — la cámara del stick
+derecho no gira y el HUD de slots de RKN aparece, que es exactamente lo que ese flujo necesita.
+La puntería sigue siendo el centro de la pantalla mientras no muevas el mouse físico.
+
 ### Comandos chat
 
 | Comando        | Qué hace |

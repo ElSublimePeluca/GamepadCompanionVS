@@ -44,7 +44,7 @@ public sealed class GamepadInputDriver
         buttons = new ButtonMapper(capi, hotkeys, cursor);
         movement = new MovementMapper(capi);
         camera = new CameraMapper(capi, config);
-        triggers = new TriggerMapper(capi);
+        triggers = new TriggerMapper(capi, buttons);
         toggles = new ToggleManager(capi);
         radial = new RadialMenuDialog(capi);
         cursorClicks = new CursorClickMapper(capi, cursor);
@@ -133,6 +133,12 @@ public sealed class GamepadInputDriver
             return;
         }
 
+        // Teclas mantenidas: el press va ANTES de la etapa de clicks para que
+        // "mantener el modificador + gatillo" funcione aunque los dos edges
+        // caigan en el mismo tick (el mod que lee el modificador lo lee en el
+        // MouseDown). El release va después, ver ButtonMapper.ApplyHoldPresses.
+        buttons.ApplyHoldPresses(current, previous);
+
         // Cursor virtual aparece SIEMPRE que hay un GuiDialog (modal) abierto.
         // RB held = modo smooth: stick derecho mueve continuo + RT/LT clickean.
         // RB suelto = modo slot: DPad salta cursor por pasos del tamaño de un
@@ -196,6 +202,7 @@ public sealed class GamepadInputDriver
         }
 
         buttons.Apply(current, previous);
+        buttons.ApplyHoldReleases(current);
         toggles.OnTick(current, previous);
     }
 
