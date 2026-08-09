@@ -36,6 +36,10 @@ public class GamepadCompanionModSystem : ModSystem
     public override void StartClientSide(ICoreClientAPI api)
     {
         capi = api;
+        // Los estáticos de ScreenManager viven lo que vive el proceso, pero el
+        // ModSystem se reinstancia en cada carga de mundo: rearmamos el espejo
+        // para que un ClearAll() de la sesión anterior no lo deje apagado.
+        ScreenInputMirror.Reset();
         config = api.LoadModConfig<GamepadCompanionConfig>(ConfigFile) ?? new GamepadCompanionConfig();
         api.StoreModConfig(config, ConfigFile);
 
@@ -88,6 +92,13 @@ public class GamepadCompanionModSystem : ModSystem
             OpenConfigDialog();
             return true;
         });
+
+        // Salida del mundo (menú Escape, muerte, kick, desconexión, crash del
+        // hilo de cliente: todos pasan por ClientMain.DestroyGameSession, que
+        // dispara este evento como primera cosa). Es la única ventana donde
+        // todavía podemos mandar el MouseUp/KeyUp de verdad; en Dispose el
+        // ClientMain ya está marcado como disposed y los ignora en silencio.
+        api.Event.LeaveWorld += OnLeaveWorld;
 
         RegisterCommands(api);
 
@@ -208,6 +219,14 @@ public class GamepadCompanionModSystem : ModSystem
             });
     }
 
+    private void OnLeaveWorld()
+    {
+        // ClientEventAPI.Trigger aísla las excepciones de los handlers, así
+        // que si algo acá tira no se lleva puesto el teardown del juego.
+        driver?.ReleaseAll();
+        ScreenInputMirror.ClearAll();
+    }
+
     // Helper: el callback persiste los slots actuales tras cualquier cambio
     // del usuario en el dialog. Centralizado aquí para mantener un único
     // punto de save y evitar que callsites olviden hacerlo.
@@ -231,6 +250,8 @@ public class GamepadCompanionModSystem : ModSystem
 
     public override void Dispose()
     {
+        if (capi is not null)
+            capi.Event.LeaveWorld -= OnLeaveWorld;
         if (capi is not null && renderer is not null)
             capi.Event.UnregisterRenderer(renderer, EnumRenderStage.Before);
         if (capi is not null && cursorRenderer is not null)
@@ -241,8 +262,18 @@ public class GamepadCompanionModSystem : ModSystem
         toggleHud?.Dispose();
         toggleHud = null;
         // Bindings de "mantener tecla": soltar antes de tirar el driver, si no
-        // el KeyUp nunca sale y la tecla queda apretada en KeyboardState.
+        // el KeyUp nunca sale y la tecla queda apretada en KeyboardState. Ojo:
+        // acá ClientMain ya tiene disposed=true y OnKeyUp retorna sin hacer
+        // nada — el release que sirve es el de OnLeaveWorld. Esto queda como
+        // limpieza de nuestro propio heldByButton.
         driver?.Buttons.ReleaseHolds();
+        // Backstop del espejo: escritura directa a los estáticos, sin pasar
+        // por el engine (UpdateMouseButtonState no chequea `disposed` y
+        // caminaría ClientSystems ya dispuestos). Después de esto el espejo
+        // queda apagado, así que el `finally` del driver — que sigue
+        // corriendo mientras se desarma el stack de un Dispose reentrante
+        // desde el menú Escape — ya no puede volver a escribir nada.
+        ScreenInputMirror.ClearAll();
         driver?.Radial.TryClose();
         driver?.Radial.Dispose();
         gamepad?.Dispose();

@@ -51,19 +51,51 @@ public sealed class GamepadInputDriver
         worldMapZoom = new WorldMapZoomMapper(capi);
     }
 
+    // El tick real está en OnTickCore. Este wrapper existe por una sola razón:
+    // la proyección del estado sintético (ClientMain.KeyboardState de los
+    // toggles y los estáticos de ScreenManager) tiene que correr en TODOS los
+    // caminos, no en el camino feliz. Antes había cuatro `return` (gamepad
+    // desconectado, sin foco, radial, teclado virtual) por encima de
+    // toggles.OnTick, y encima ClientEventManager.TriggerRenderStage no tiene
+    // try/catch: una excepción de un handler de otro mod, disparada desde
+    // adentro de nuestro click sintético, se lleva puesto el resto del tick.
+    // Con el commit en un `finally`, todo eso pasa de "estado latcheado" a
+    // "se corrige en el frame siguiente".
     public void OnTick(GamepadState current, GamepadState previous, float dt)
+    {
+        bool injecting = current.IsConnected && IsWindowFocused();
+        try
+        {
+            OnTickCore(current, previous, dt, injecting);
+        }
+        finally
+        {
+            toggles.ProjectKeyboardState(injecting);
+            triggers.ProjectMouseKeyCodes(injecting);
+            ScreenInputMirror.Commit(toggles, triggers, buttons, injecting);
+        }
+    }
+
+    private void OnTickCore(GamepadState current, GamepadState previous,
+                            float dt, bool injecting)
     {
         if (!current.IsConnected)
         {
             movement.Release();
+            // triggers/cursor también: si el pad se desenchufa (o se le acaba
+            // la batería) con LT apretado, este `return` corre en todos los
+            // frames siguientes y el release se vuelve inalcanzable —
+            // InWorldMouseState.Right quedaba latcheado hasta el alt-tab.
+            triggers.Release();
             buttons.ReleaseHolds();
+            cursor.Hide();
             return;
         }
 
         // Sin foco de ventana (alt-tab) no inyectamos NADA al juego ni al mouse
         // del OS. Antes el cursor virtual seguía snapeando el mouse a la posición
         // de VS aunque estuviera en segundo plano (reportado por ElSublimePeluca).
-        if (!IsWindowFocused())
+        if (!injecting)
         {
             movement.Release();
             triggers.Release();
@@ -204,6 +236,27 @@ public sealed class GamepadInputDriver
         buttons.Apply(current, previous);
         buttons.ApplyHoldReleases(current);
         toggles.OnTick(current, previous);
+        // Ojo: la proyección a KeyboardState / ScreenManager NO va acá — va en
+        // el `finally` de OnTick, que es el único punto que alcanzan también
+        // los cuatro `return` de arriba.
+    }
+
+    // Soltar todo lo que estemos inyectando, pasando por el engine. Lo llama
+    // el ModSystem desde Event.LeaveWorld: es el último instante en que el
+    // ClientMain todavía acepta input sintético (TriggerLeaveWorld corre al
+    // principio de DestroyGameSession, antes de MouseGrabbed=false y antes de
+    // Dispose(), que es lo que pone `disposed = true` y convierte a
+    // OnKeyUp/OnMouseUp en no-ops silenciosos). Acá es donde el MouseUp
+    // todavía destraba los latches de vanilla (ground storage) y de mods
+    // (CombatOverhaul).
+    public void ReleaseAll()
+    {
+        movement.Release();
+        triggers.Release();
+        buttons.ReleaseHolds();
+        cursor.Hide();
+        toggles.ProjectKeyboardState(injecting: false);
+        triggers.ProjectMouseKeyCodes(injecting: false);
     }
 
     // Tamaño del salto del cursor con DPad. ~52 px coincide con el ancho

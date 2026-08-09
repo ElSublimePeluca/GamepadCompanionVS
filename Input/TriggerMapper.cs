@@ -1,4 +1,3 @@
-using OpenTK.Windowing.GraphicsLibraryFramework;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.Client.NoObf;
@@ -59,6 +58,13 @@ public sealed class TriggerMapper
     private bool wroteLeft;
     private bool wroteRight;
 
+    // Lo lee ScreenInputMirror.Commit para reproyectar
+    // ScreenManager.MouseButtonState cada frame: es el mismo registro con el
+    // que ReleaseInto decide si mandar el MouseUp, así que espejo y engine no
+    // pueden divergir.
+    public bool WroteLeft  => wroteLeft;
+    public bool WroteRight => wroteRight;
+
     public TriggerMapper(ICoreClientAPI capi, ButtonMapper buttons)
     {
         this.capi = capi;
@@ -105,16 +111,22 @@ public sealed class TriggerMapper
             return;
         }
 
+        // Anotamos ANTES de salir al engine. SetButton reentra en handlers de
+        // terceros y ClientEventManager.TriggerRenderStage no tiene try/catch:
+        // si alguno tira, la excepción se lleva puesto el resto del OnTick y
+        // nos dejaría con el botón apretado en el engine y el flag en false,
+        // o sea sin nadie que lo suelte. Anotando primero el peor caso es
+        // soltar de más, que es el lado seguro.
         if (rtNow != rtPrev)
         {
-            SetButton(client, EnumMouseButton.Left, rtNow);
             wroteLeft = rtNow;
+            SetButton(client, EnumMouseButton.Left, rtNow);
         }
 
         if (ltNow != ltPrev)
         {
-            SetButton(client, EnumMouseButton.Right, ltNow);
             wroteRight = ltNow;
+            SetButton(client, EnumMouseButton.Right, ltNow);
         }
     }
 
@@ -126,6 +138,15 @@ public sealed class TriggerMapper
     private static void SetButton(ClientMain client, EnumMouseButton button,
                                   bool down)
     {
+        // Espejo a ScreenManager.MouseButtonState ANTES de bajar al engine:
+        // un click físico lo escribe en ScreenManager.OnMouseDown y recién
+        // después despacha hacia ClientMain, así que un mod que polee el
+        // estático dentro de su propio handler de MouseDown ve el botón ya
+        // apretado. Es una escritura de borde por fidelidad de orden; la que
+        // garantiza que no quede latcheado es la reproyección por frame de
+        // ScreenInputMirror.Commit.
+        ScreenInputMirror.SetMouseEdge(button, down);
+
         client.UpdateMouseButtonState(button, down);
         if (down) return;
 
@@ -170,30 +191,80 @@ public sealed class TriggerMapper
         if (state is null || code < 0 || code >= state.Length) return;
         if (!state[code]) return;
         if (buttons.IsHoldingKeyCode(code)) return;
-        if (IsPhysicallyDown(code)) return;
+        if (ScreenInputMirror.IsKeyDown(code)) return;
 
         state[code] = false;
         if (raw is not null && code < raw.Length) raw[code] = false;
+        // Mismo heal en el espejo: acá ya sabemos que GLFW dice que la tecla
+        // está suelta, y un fantasma en KeyboardKeyState es PERMANENTE (los
+        // estáticos de ScreenManager no se reasignan al recargar el mundo).
+        ScreenInputMirror.SetKeyEdge(code, down: false);
         capi.Logger.Notification(
             "GamepadCompanion: trigger pressed while mouse was ungrabbed with " +
             "no dialog open and the free-mouse key latched in KeyboardState — " +
             "released the key to reclaim mouse grab");
     }
 
-    // ¿El OS reporta esta tecla apretada? KeyConverter.GlKeysToNew traduce
-    // GlKeys → el enum Keys de GLFW (-1 si no hay equivalente). Sin ventana
-    // (headless / contexto no current) devolvemos false y dejamos que decida
-    // el resto del heal, igual que hace IsWindowFocused en el driver.
-    private static unsafe bool IsPhysicallyDown(int glKeyCode)
-    {
-        if (glKeyCode < 0 || glKeyCode >= KeyConverter.GlKeysToNew.Length)
-            return false;
-        int glfwKey = KeyConverter.GlKeysToNew[glKeyCode];
-        if (glfwKey < 0) return false;
+    // Los pseudo-códigos de mouse de ClientMain.KeyboardState (240+botón).
+    // UpdateMouseButtonState NO los escribe — solo lo hace OnMouseDownRaw, o
+    // sea el camino del click físico. Consecuencia: capi.Input.IsHotKeyPressed
+    // devuelve false para CUALQUIER hotkey bindeada a un botón de mouse cuando
+    // el click vino del gamepad, en todos los mods a la vez. Es la misma clase
+    // de agujero que el de ScreenManager, una capa más abajo y sobre la API
+    // pública y documentada.
+    //
+    // Proyección por frame (no escritura de borde) por el mismo motivo que el
+    // espejo: el array es persistente y no lo limpia nadie al perder foco.
+    //
+    // Pero acá NO se puede hacer `state[code] = want || botón físico`, como sí
+    // se hace con los estáticos de ScreenManager. Esos son un reflejo crudo del
+    // OS; éste no: OnMouseDownRaw (ClientMain.cs:1951) escribe MouseStateRaw,
+    // después recorre los ClientSystems y si alguno tiene CaptureRawMouse()
+    // RETORNA — sin escribir KeyboardState[240+botón]. O sea que "botón físico
+    // apretado" y "el engine lo anotó" no son lo mismo: un click real comido
+    // por una GUI deja el código en false a propósito. Un OR contra GLFW lo
+    // pondría en true y estaríamos inventando input del mouse físico.
+    //
+    // Por eso solo escribimos lo NUESTRO y llevamos la cuenta de si lo forzamos
+    // (forcedLeft/forcedRight). Al soltar: si el botón físico está suelto,
+    // limpiamos; si está apretado, no tocamos nada y dejamos que el
+    // OnMouseUpRaw real ponga el valor que corresponda.
+    private bool forcedLeftCode;
+    private bool forcedRightCode;
 
-        var window = GLFW.GetCurrentContext();
-        if (window == null) return false;
-        return GLFW.GetKey(window, (Keys)glfwKey) == InputAction.Press;
+    public void ProjectMouseKeyCodes(bool injecting)
+    {
+        bool wantLeft  = injecting && wroteLeft;
+        bool wantRight = injecting && wroteRight;
+
+        // Ni queremos forzar nada ni hay nada nuestro que deshacer: el array es
+        // del engine, no lo tocamos.
+        if (!wantLeft && !wantRight && !forcedLeftCode && !forcedRightCode)
+            return;
+
+        if (capi.World is not ClientMain client) return;
+        var state = client.KeyboardState;
+        if (state is null) return;
+
+        forcedLeftCode  = Project(state, EnumMouseButton.Left,
+                                  wantLeft,  forcedLeftCode);
+        forcedRightCode = Project(state, EnumMouseButton.Right,
+                                  wantRight, forcedRightCode);
+
+        static bool Project(bool[] state, EnumMouseButton button,
+                            bool want, bool forced)
+        {
+            int code = KeyCombination.MouseStart + (int)button;
+            if (code < 0 || code >= state.Length) return false;
+            if (want)
+            {
+                state[code] = true;
+                return true;
+            }
+            if (!forced) return false;
+            if (!ScreenInputMirror.IsMouseDown(button)) state[code] = false;
+            return false;
+        }
     }
 
     // Para que el driver lo llame en branches donde Apply se saltea (radial,

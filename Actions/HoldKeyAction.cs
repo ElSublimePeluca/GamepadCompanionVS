@@ -1,3 +1,4 @@
+using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
@@ -52,11 +53,23 @@ public sealed class HoldKeyAction : IGameAction, IHoldableAction
         Label = label ?? BuildDefaultLabel(keyCode, ctrl, shift, alt);
     }
 
+    // El espejo a ScreenManager.KeyboardKeyState va SIEMPRE del lado seguro
+    // del `capi.World is not ClientMain`: al apretar, después (si no llegamos
+    // a apretar no somos dueños de nada); al soltar, ANTES (los estáticos de
+    // ScreenManager sobreviven a que el mundo se muera, así que soltarlos no
+    // puede depender de que el mundo siga vivo).
+    //
+    // Además el espejo del down va ANTES del OnKeyDown: un KeyDown físico
+    // escribe KeyboardKeyState en ScreenManager.OnKeyDown y recién después
+    // baja a ClientMain, así que un mod que lea el modificador dentro de su
+    // propio handler lo ve vivo. Es la forma exacta del bug de RKN Crafting
+    // de v1.8.1, una capa más arriba.
     public void Press(ICoreClientAPI capi)
     {
         if (held) return;
         if (capi.World is not ClientMain cm) return;
         held = true;
+        ScreenInputMirror.SetKeyEdge(KeyCode, down: true);
         cm.OnKeyDown(NewEvent());
     }
 
@@ -64,18 +77,30 @@ public sealed class HoldKeyAction : IGameAction, IHoldableAction
     {
         if (!held) return;
         held = false;
+        ScreenInputMirror.SetKeyEdge(KeyCode, down: false);
         if (capi.World is not ClientMain cm) return;
         cm.OnKeyUp(NewEvent());
     }
 
     // Fallback para consumidores que solo saben ejecutar una vez (la rueda
-    // radial): tap, igual que KeyPressAction.
+    // radial): tap, igual que KeyPressAction. Corre un frame después y FUERA
+    // del OnTick del driver (RadialMenuDialog lo difiere con RegisterCallback),
+    // así que el `finally` que reproyecta el espejo no lo cubre — por eso el
+    // release del espejo va en un finally propio.
     public void Execute(ICoreClientAPI capi)
     {
         if (capi.World is not ClientMain cm) return;
-        cm.OnKeyDown(NewEvent());
-        cm.OnKeyUp(NewEvent());
         held = false;
+        try
+        {
+            ScreenInputMirror.SetKeyEdge(KeyCode, down: true);
+            cm.OnKeyDown(NewEvent());
+            cm.OnKeyUp(NewEvent());
+        }
+        finally
+        {
+            ScreenInputMirror.SetKeyEdge(KeyCode, down: false);
+        }
     }
 
     private KeyEvent NewEvent() => new()

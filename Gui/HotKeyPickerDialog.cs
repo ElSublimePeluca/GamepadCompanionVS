@@ -19,6 +19,19 @@ namespace GamepadCompanion.Gui;
 // contenido completo dentro de una ventana fija; sin scroll, dialogs con
 // muchos hotkeys (gameplay+todos los mods) requerían tipear sí o sí para
 // encontrar entries no visibles.
+//
+// El precio de los dos composers es que solo UNO tiene barra de título, y en
+// VS la barra de título es la que mueve el dialog: GuiElementDialogTitleBar
+// escribe fixedX/fixedY sobre `Bounds.ParentBounds` (o sea el dialogBounds
+// del composer que la contiene) al arrastrar, y además restaura la posición
+// guardada con `api.Gui.GetDialogPosition(composer.DialogName)` al construirse
+// — el nombre es la clave, así que "gpcompanion-picker-frame" tiene posición
+// propia y "gpcompanion-picker-list" no. Resultado: apenas el usuario movía
+// el picker una vez, el frame quedaba donde lo dejó y la lista seguía
+// centrada en pantalla, flotando fuera del marco por encima de todo lo demás
+// (issue #3 "ui error"). SyncListToFrame() lo arregla pegando el origen del
+// composer de la lista al del frame en cada frame, con exactamente la misma
+// receta que usa el engine para mover un dialog.
 public sealed class HotKeyPickerDialog : GuiDialog
 {
     private const int    VisibleRows   = 18;
@@ -210,6 +223,48 @@ public sealed class HotKeyPickerDialog : GuiDialog
         var sb = Composers["frame"].GetScrollbar("scrollbar");
         sb.CurrentYPosition = 0;
         ComposeList();
+    }
+
+    // OnRenderGUI es el hook que recorre Composers y los dibuja. Sincronizar
+    // acá (y no en el drag) cubre los tres caminos por los que el frame se
+    // mueve sin avisarnos: arrastre con el mouse, posición persistida que el
+    // title bar aplica en su constructor, y el recálculo del engine al
+    // cambiar el tamaño de la ventana.
+    public override void OnRenderGUI(float deltaTime)
+    {
+        SyncListToFrame();
+        base.OnRenderGUI(deltaTime);
+    }
+
+    // Misma secuencia que GuiElementDialogTitleBar.SetUpMovableState: pasar a
+    // Alignment.None y posicionar por fixedX/fixedY en unidades sin escalar.
+    // Los márgenes hay que ponerlos en cero a mano porque
+    // calcMarginFromAlignment no los toca cuando Alignment == None — se
+    // quedarían con el offset de centrado que dejó CenterMiddle.
+    private void SyncListToFrame()
+    {
+        var frame = Composers["frame"]?.Bounds;
+        var list  = Composers["list"]?.Bounds;
+        if (frame is null || list is null || !frame.Initialized) return;
+
+        double scale = RuntimeEnv.GUIScale;
+        if (scale <= 0) return;
+        double x = frame.absX / scale;
+        double y = frame.absY / scale;
+
+        if (list.Alignment == EnumDialogArea.None &&
+            Math.Abs(list.fixedX - x) < 0.01 &&
+            Math.Abs(list.fixedY - y) < 0.01) return;
+
+        list.Alignment    = EnumDialogArea.None;
+        list.fixedOffsetX = 0;
+        list.fixedOffsetY = 0;
+        list.fixedX       = x;
+        list.fixedY       = y;
+        list.absMarginX   = 0;
+        list.absMarginY   = 0;
+        list.MarkDirtyRecursive();
+        list.CalcWorldBounds();
     }
 
     private bool OnPicked(int index)

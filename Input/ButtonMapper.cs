@@ -208,6 +208,17 @@ public sealed class ButtonMapper
         return sb.Length == 0 ? "-" : sb.ToString();
     }
 
+    // Keycodes que las acciones holdables mantienen apretados AHORA MISMO.
+    // Lo consume ScreenInputMirror.Commit para reproyectar
+    // ScreenManager.KeyboardKeyState por frame. Recibe la colección de afuera
+    // para no allocar en cada frame de render.
+    public void CollectHeldKeyCodes(
+        System.Collections.Generic.ICollection<int> into)
+    {
+        foreach (var action in heldByButton.Values)
+            if (action.HeldKeyCode is int code) into.Add(code);
+    }
+
     // ¿Hay alguna acción holdable sosteniendo esta tecla ahora mismo? Lo
     // pregunta TriggerMapper antes de "curar" una tecla que cree fantasma.
     // Se resuelve contra heldByButton (no contra Bindings) por la misma razón

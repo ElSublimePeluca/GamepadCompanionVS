@@ -203,6 +203,12 @@ public sealed class InputTracer
         line.Append(" cur=v").Append(cursor.Visible ? '1' : '0')
             .Append("/o").Append(cursor.PhysicalOverride ? '1' : '0');
 
+        // Espejo de ScreenManager: la capa que lee el idiom "poleo los
+        // estáticos" (Hydrate or Diedrate y cualquier mod que copie el patrón).
+        // Es invisible desde capi.Input, así que sin esto un "sigue sin poder
+        // beber" no se puede diagnosticar a distancia.
+        line.Append(" sm=").Append(ScreenInputMirror.Describe());
+
         AppendInteractionContext(line, client, controls);
     }
 

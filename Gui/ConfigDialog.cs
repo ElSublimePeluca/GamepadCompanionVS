@@ -37,6 +37,8 @@ public sealed class ConfigDialog : GuiDialog
     private const double SensRowGap     = 10;
     private const double SensLabelW     = 140;
     private const double SensControlW   = 280;
+    private const double SensResetGap   = 16;
+    private const double SensResetH     = 32;
 
     // Tab body: layout para "Botones". 12 filas a 28px = 336px que justo
     // entra en el body disponible (DialogH - title - tabbar - footer - margins).
@@ -209,7 +211,17 @@ public sealed class ConfigDialog : GuiDialog
         // El control de tabs requiere setear el activo después del Compose
         // (DataInt en GuiTab es solo seed; el state activo lo guarda el
         // elemento internamente).
-        SingleComposer.GetHorizontalTabs("tabs").activeElement = currentTab;
+        //
+        // Ojo: GuiElementHorizontalTabs.activeElement es la POSICIÓN en el
+        // array de tabs, no el DataInt. SetValue(i) hace `handler(tabs[i]
+        // .DataInt)` pero guarda `activeElement = i`. Nuestro orden visual
+        // (Rueda, Botones, Sensibilidad) no coincide con el valor de las
+        // constantes (Sensibilidad=1, Botones=2), así que asignar currentTab
+        // directo resaltaba la tab equivocada: elegir Sensibilidad mostraba
+        // el contenido correcto pero dejaba iluminada Botones. Issue #1.
+        int activeIdx = Array.FindIndex(tabs, t => t.DataInt == currentTab);
+        SingleComposer.GetHorizontalTabs("tabs").activeElement =
+            activeIdx < 0 ? 0 : activeIdx;
     }
 
     private void ComposeWheelTab(GuiComposer compo, double startY)
@@ -425,6 +437,34 @@ public sealed class ConfigDialog : GuiDialog
             },
             swapSwitchBounds, "swaptriggers");
         y += SensRowH + SensRowGap;
+
+        // Volver a los valores de fábrica de esta tab. Los sliders van de
+        // 100 a 5000 y es fácil dejarlos en un valor injugable sin saber
+        // cuál era el default; hasta ahora la única salida era borrar el
+        // JSON de config a mano. Issue #4.
+        var resetBounds = ElementBounds.Fixed(
+            Margin, y + SensResetGap,
+            DialogW - 2 * Margin, SensResetH);
+        compo.AddSmallButton(Lang.Get("gamepadcompanion:restore-defaults"),
+                             () => { RestoreSensitivityDefaults(); return true; },
+                             resetBounds, EnumButtonStyle.Normal);
+    }
+
+    // Los defaults viven en GamepadCompanionConfig como initializers de
+    // propiedad, así que una instancia nueva ES la tabla de defaults — no
+    // hace falta duplicar los números acá y no se pueden desincronizar.
+    private void RestoreSensitivityDefaults()
+    {
+        var defaults = new GamepadCompanionConfig();
+        config.YawSensitivity   = defaults.YawSensitivity;
+        config.PitchSensitivity = defaults.PitchSensitivity;
+        config.Deadzone         = defaults.Deadzone;
+        config.InvertPitch      = defaults.InvertPitch;
+        config.SwapTriggers     = defaults.SwapTriggers;
+        config.PrecisionFactor  = defaults.PrecisionFactor;
+        onChanged?.Invoke();
+        Compose();
+        ApplySensitivityWidgetState();
     }
 
     private void AddSensitivityRow(

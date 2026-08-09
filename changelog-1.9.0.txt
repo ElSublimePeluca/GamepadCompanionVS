@@ -1,0 +1,72 @@
+GamepadCompanion v1.9.0
+
+Compatibility
+
+- Hydrate or Diedrate now works with the gamepad. Reported by pngwn: Ctrl +
+  hold right click drinks from a water block with keyboard and mouse, but
+  pressing LStick for Ctrl and holding LT did nothing.
+
+  Vintage Story keeps a layer of input state that this mod had never touched.
+  Above the client there is a screen manager that records, in three static
+  fields, which keys are down, which modifiers are down and which mouse buttons
+  are down. The game itself writes those fields only from the raw window
+  events, and it barely reads them back — but they are the cheapest thing for a
+  mod to poll, so mods do. Hydrate or Diedrate is one of them: it registers its
+  drink action as "Ctrl + right mouse button" and then, ten times a second,
+  simply asks those fields whether Ctrl and the right button are down. Every
+  synthetic input this mod produced entered the chain one level below, so from
+  Hydrate or Diedrate's point of view the gamepad did not exist at all.
+
+  Gamepad input is now mirrored into that layer: the triggers report their
+  mouse button, the Ctrl and Shift toggles report their modifier, and a "hold
+  key" binding reports its key. This is not specific to Hydrate or Diedrate —
+  any mod that polls the same way will now see the gamepad.
+
+  Two notes for the water case specifically. Drinking takes a full second of
+  looking at the same block, and the server restarts the count whenever the
+  block you are aiming at changes, so take your thumb off the right stick while
+  you drink: a stick resting just past the dead zone drifts far enough in a
+  second to cross onto the next block. And if the progress ring appears but
+  never fills, that is the drift, not the input.
+
+- Hotkeys that other mods bind to a mouse button now also answer correctly when
+  the click comes from a trigger. The game's own "is this hotkey pressed?" call
+  reads a mouse button through a keyboard slot that only a physical click was
+  filling in. Same family of bug as above, one layer down and on the documented
+  API, so it is fixed here too.
+
+Reliability
+
+  All of the above is state that nothing in the game ever resets — it outlives
+  leaving the world, and a value left behind by mistake would survive until you
+  restart the game. So the release path was rebuilt rather than extended:
+
+- Everything this mod injects is now recomputed from scratch every frame, and
+  that recomputation runs on every path — gamepad unplugged, window not
+  focused, radial menu, virtual keyboard, paused, and even while unwinding an
+  exception thrown by another mod inside our own click. Releasing is no longer
+  a list of cases to remember.
+
+- Leaving the world (escape menu, death screen, kick, lost connection) now
+  releases everything through the game itself, at the one moment where the
+  client still accepts it. Until now that cleanup ran during shutdown, where
+  the client has already stopped listening and silently ignored it.
+
+- Unplugging the controller — or its battery dying — while a trigger was held
+  left the mouse button stuck down until you alt-tabbed. It now releases
+  immediately.
+
+Fixes
+
+- The settings window highlighted the wrong tab: choosing Sensitivity showed
+  the sensitivity controls but lit up Buttons. Reported as issue #1.
+
+- The "choose action" list could end up drawn outside its own window, floating
+  over the settings dialog. It happened once the picker had been moved: Vintage
+  Story remembers a dialog's position by name, and the list was a second,
+  unnamed panel that stayed centred while the frame around it moved away. The
+  list now follows the frame. Reported as issue #3.
+
+- The Sensitivity tab has a "Restore defaults" button, like the Wheel tab.
+  Until now a slider left at an unusable value could only be fixed by deleting
+  the config file by hand. Reported as issue #4.
