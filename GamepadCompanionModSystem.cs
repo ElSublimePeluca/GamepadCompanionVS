@@ -43,7 +43,10 @@ public class GamepadCompanionModSystem : ModSystem
         config = api.LoadModConfig<GamepadCompanionConfig>(ConfigFile) ?? new GamepadCompanionConfig();
         api.StoreModConfig(config, ConfigFile);
 
-        gamepad = new GlfwGamepadProvider(api.Logger);
+        gamepad = new GlfwGamepadProvider(api.Logger)
+        {
+            PreferredDeviceName = config.PreferredDevice,
+        };
         driver = new GamepadInputDriver(api, config);
         tracer = new InputTracer(api, gamepad, driver.Toggles, driver.Cursor,
                                  driver.Buttons);
@@ -129,6 +132,40 @@ public class GamepadCompanionModSystem : ModSystem
                 var formatted = string.Join(" ", axes.Select((v, i) => $"a{i}={v:+0.00;-0.00;0.00}"));
                 api.Logger.Notification($"GamepadCompanion: raw axes: {formatted}");
                 return TextCommandResult.Success(formatted);
+            });
+
+        // Escape hatch para cuando la autodetección elige el joystick
+        // equivocado: no hay heurística que cubra todos los HID con forma de
+        // gamepad que existen, pero el usuario sí ve cuál es el suyo.
+        api.ChatCommands.Create("gpdevice")
+            .WithDescription("List joysticks, or force one: .gpdevice <jid> | auto")
+            .WithArgs(parsers.OptionalWord("jid"))
+            .HandleWith(args =>
+            {
+                if (gamepad is null) return TextCommandResult.Error("gamepad provider not initialized");
+                string? arg = args[0] as string;
+
+                if (string.IsNullOrWhiteSpace(arg))
+                    return ListDevices(api);
+
+                if (arg.Equals("auto", System.StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("clear", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    gamepad.ResetSelection();
+                    config!.PreferredDevice = null;
+                    api.StoreModConfig(config, ConfigFile);
+                    return TextCommandResult.Success("gamepad device = auto");
+                }
+
+                if (!int.TryParse(arg, out int jid))
+                    return TextCommandResult.Error($"expected a joystick id or 'auto', got '{arg}'");
+                if (!gamepad.SelectDevice(jid))
+                    return TextCommandResult.Error($"no joystick present on jid={jid}");
+
+                config!.PreferredDevice = gamepad.PreferredDeviceName;
+                api.StoreModConfig(config, ConfigFile);
+                return TextCommandResult.Success(
+                    $"gamepad device = jid {jid}: {gamepad.DeviceName} (saved)");
             });
 
         api.ChatCommands.Create("gptrace")
@@ -217,6 +254,36 @@ public class GamepadCompanionModSystem : ModSystem
                 OpenConfigDialog();
                 return TextCommandResult.Success("opened gpconfig");
             });
+    }
+
+    // El listado va al chat (para que el usuario elija sin salir del juego) y
+    // al log (para que entre en un reporte de bug sin pedirle nada más).
+    private TextCommandResult ListDevices(ICoreClientAPI api)
+    {
+        var devices = gamepad!.ScanDevices();
+        if (devices.Count == 0)
+        {
+            api.Logger.Notification("GamepadCompanion: gpdevice found no joysticks present");
+            return TextCommandResult.Success(
+                "no joysticks present (on Flatpak check that /dev/input is shared)");
+        }
+
+        var lines = new System.Collections.Generic.List<string>();
+        foreach (var d in devices)
+        {
+            string mark = d.Selected ? " <- in use" : "";
+            string state = d.Eligible ? "eligible" : $"skipped: {d.RejectReason}";
+            lines.Add($"[{d.Jid}] {d.Name} (buttons={d.Buttons}, axes={d.Axes}, " +
+                      $"hats={d.Hats}) {state}{mark}");
+        }
+        string pref = gamepad.PreferredDeviceName is { } p ? $"\"{p}\"" : "auto";
+        string text = string.Join("\n", lines);
+        api.Logger.Notification(
+            $"GamepadCompanion: gpdevice preference={pref}\n  " +
+            string.Join("\n  ", lines));
+        return TextCommandResult.Success(
+            $"preference: {pref}\n{text}\nUse .gpdevice <number> to force one, " +
+            $".gpdevice auto to undo.");
     }
 
     private void OnLeaveWorld()

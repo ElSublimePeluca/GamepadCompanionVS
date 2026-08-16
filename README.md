@@ -55,7 +55,19 @@ En los layouts PS4 el mod ignora los raw buttons 6/7 (L2/R2 como botón digital)
 | Switch Pro Controller | ⚠️ Depende del modo |
 | Joysticks vintage / no-xpad / no-PS4 | ❌ Layout desconocido, mapeos van a salir mal |
 
-Si tu controller no funciona, podés diagnosticar con `/gpaxes` (dump raw de los axes). El log del cliente también imprime el layout detectado al conectar (`detected ... layout`).
+Si tu controller no funciona, podés diagnosticar con `/gpaxes` (dump raw de los axes). El log del cliente también imprime el layout detectado al conectar (`detected ... layout`) y la lista completa de joysticks presentes (`candidates at connect`).
+
+### El personaje camina o gira solo, o el mod ignora tu control
+
+El mod se queda con el primer joystick que el sistema le muestra, y no todo lo que el sistema
+llama "joystick" es un gamepad: controladoras RGB de placa madre, teclados con teclas
+programables y otros HID aparecen con la misma forma (botones + ejes). Si el mod agarra uno de
+esos, el resultado típico es un personaje que camina en diagonal y una cámara que gira sola,
+mientras tu control real ni figura.
+
+Corré `/gpdevice` para ver todos los joysticks presentes: el listado dice cuál está en uso y por
+qué descartó a los demás. Si el elegido no es el tuyo, `/gpdevice <número>` fuerza el correcto y
+lo guarda en el config para las próximas sesiones (`/gpdevice auto` deshace la elección).
 
 ### Steam Input
 
@@ -131,6 +143,7 @@ La puntería sigue siendo el centro de la pantalla mientras no muevas el mouse f
 | `/gpconfig`    | Abre el dialog de configuración (también con tecla Insert) |
 | `/gpdumphotkeys` | Lista todas las hotkeys registradas en el log |
 | `/gpaxes`      | Dump raw de los axes del gamepad (debug) |
+| `/gpdevice`    | Lista los joysticks que ve el juego; `/gpdevice <n>` fuerza uno, `/gpdevice auto` vuelve a autodetección |
 | `/gpyaw <val>` | Set sensibilidad horizontal de cámara |
 | `/gppitch <val>` | Set sensibilidad vertical |
 | `/gpinvertpitch` | Toggle invertir pitch |

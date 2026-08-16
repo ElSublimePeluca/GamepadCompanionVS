@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using Vintagestory.API.Common;
 
@@ -77,6 +78,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private const int MinExpectedAxes = 6;
     private const float DpadThreshold = 0.5f;
     private const float Ds4LayoutThreshold = -0.9f;
+    private const float PinnedAxisThreshold = 0.99f;
 
     private const int XboxBtHidMinButtons = 15;
 
@@ -130,8 +132,21 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private bool ltRangeSigned;
     private bool rtRangeSigned;
 
+    // Guardia post-conexión contra devices fantasma (ver AxesLookPinned). El
+    // chequeo de selección mira los ejes en el instante de elegir, y algunos
+    // HID reportan todo en 0 hasta que llega su primer reporte real: ese
+    // device pasaría el filtro y recién después se clavaría en -1. Si los
+    // sticks están al extremo en TODOS los polls del primer par de segundos,
+    // lo soltamos y volvemos a escanear. No aplica a la selección manual: si
+    // el usuario eligió ese device, es el que quiere.
+    private const int PhantomGuardPolls = 120;
+    private bool manualSelection;
+    private int pollsSinceConnect;
+    private int pinnedPollsSinceConnect;
+
     public bool IsConnected => joystickId.HasValue;
     public string? DeviceName { get; private set; }
+    public string? PreferredDeviceName { get; set; }
 
     public GlfwGamepadProvider(ILogger logger)
     {
@@ -149,11 +164,14 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
 
         if (!joystickId.HasValue)
         {
-            TryFindGamepad();
+            // El escaneo corre en cada poll mientras no hay gamepad, así que
+            // solo logueamos una vez por segundo para no inundar el log.
+            bool verbose = pollsWithoutGamepad % DiagnosticIntervalPolls == 0;
+            TryFindGamepad(verbose);
             if (!joystickId.HasValue)
             {
-                if (pollsWithoutGamepad++ % DiagnosticIntervalPolls == 0)
-                    LogDiagnosticScan();
+                if (verbose) LogDiagnosticScan("scan");
+                pollsWithoutGamepad++;
                 return GamepadState.Disconnected;
             }
             pollsWithoutGamepad = 0;
@@ -164,35 +182,114 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         return PollRaw(jid);
     }
 
-    private unsafe void TryFindGamepad()
+    private unsafe void TryFindGamepad(bool verbose)
     {
+        // 1. Override manual del usuario (.gpdevice). Gana sobre cualquier
+        //    heurística: si alguien lo fijó a mano es justamente porque la
+        //    autodetección se equivocó, así que ni filtramos ni validamos.
+        string? pref = PreferredDeviceName;
+        if (!string.IsNullOrWhiteSpace(pref))
+        {
+            for (int jid = 0; jid < MaxJoysticks; jid++)
+            {
+                if (!GLFW.JoystickPresent(jid)) continue;
+                string name = GLFW.GetJoystickName(jid) ?? "<unknown>";
+                if (name.IndexOf(pref, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                AcceptGamepad(jid, name, $"preferred device \"{pref}\"", manual: true);
+                return;
+            }
+            // El device preferido no está enchufado. Caemos a autodetección
+            // en vez de dejar al usuario sin control, pero lo decimos.
+            if (verbose)
+                logger.Notification(
+                    $"GamepadCompanion: preferred device \"{pref}\" not present, " +
+                    $"falling back to autodetect");
+        }
+
+        // 2. Autodetección: primer joystick con forma de gamepad que además
+        //    no parezca un device fantasma.
         for (int jid = 0; jid < MaxJoysticks; jid++)
         {
             if (!GLFW.JoystickPresent(jid)) continue;
 
             string name = GLFW.GetJoystickName(jid) ?? "<unknown>";
-            if (IsKnownNotGamepad(name)) continue;
-
             _ = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
-            _ = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
+            float* axsPtr = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
 
-            bool standardSig  = btnCount >= MinExpectedButtons && axsCount >= MinExpectedAxes;
-            bool xdGamepadSig = IsXdGamepadName(name) && btnCount >= 12 && axsCount >= 4;
-            if (!standardSig && !xdGamepadSig) continue;
+            string? reject = RejectReason(name, btnCount, axsCount, axsPtr);
+            if (reject is not null)
+            {
+                // Rate-limited igual que el scan: esto corre en cada poll.
+                if (verbose)
+                    logger.Notification(
+                        $"GamepadCompanion: skipping jid={jid} \"{name}\" — {reject}");
+                continue;
+            }
 
-            joystickId = jid;
-            DeviceName = name;
-            logger.Notification(
-                $"GamepadCompanion: gamepad connected on jid={jid}: {DeviceName} " +
-                $"(buttons={btnCount}, axes={axsCount})");
+            AcceptGamepad(jid, name, "autodetect", manual: false);
             return;
         }
     }
 
+    private unsafe void AcceptGamepad(int jid, string name, string how, bool manual)
+    {
+        joystickId = jid;
+        DeviceName = name;
+        manualSelection = manual;
+        pollsSinceConnect = 0;
+        pinnedPollsSinceConnect = 0;
+        _ = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
+        _ = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
+        logger.Notification(
+            $"GamepadCompanion: gamepad connected on jid={jid}: {DeviceName} " +
+            $"(buttons={btnCount}, axes={axsCount}) [{how}]");
+        // Dejamos constancia del resto de los joysticks presentes: si elegimos
+        // mal, el log del usuario ya trae las alternativas y el .gpdevice que
+        // hay que tipear, sin pedirle otra corrida.
+        LogDiagnosticScan("candidates at connect");
+    }
+
+    // null = el device es aceptable. Si no, el motivo del descarte.
+    private static unsafe string? RejectReason(string name, int btnCount, int axsCount,
+                                               float* axsPtr)
+    {
+        if (IsKnownNotGamepad(name)) return "known non-gamepad device";
+
+        bool standardSig  = btnCount >= MinExpectedButtons && axsCount >= MinExpectedAxes;
+        bool xdGamepadSig = IsXdGamepadName(name) && btnCount >= 12 && axsCount >= 4;
+        if (!standardSig && !xdGamepadSig)
+            return $"not gamepad-shaped (buttons={btnCount}, axes={axsCount})";
+
+        if (axsPtr != null && AxesLookPinned(axsPtr, axsCount))
+            return $"sticks pinned at the extreme (a0={axsPtr[0]:+0.00;-0.00;0.00} " +
+                   $"a1={axsPtr[1]:+0.00;-0.00;0.00}), looks like a phantom device";
+
+        return null;
+    }
+
+    // Un gamepad real en reposo tiene los sticks cerca de 0 — los triggers sí
+    // pueden estar en -1 (varios layouts lo hacen), pero LX/LY no. Un device
+    // HID que no es un gamepad suele reportar TODOS sus ejes clavados en -1
+    // para siempre, y eso in-game se traduce en caminar en diagonal mientras
+    // la cámara gira sola sin parar.
+    // Caso real: Lyn_ en SteamOS tenía jid=0 = "ASRock LED Controller" (la
+    // controladora RGB de la placa madre: 12 botones, 10 ejes, todos en -1.00
+    // durante los 1770 frames del gptrace). Le ganaba la selección al Steam
+    // Controller y el personaje giraba en círculos mirando arriba a la
+    // izquierda sin tocar nada.
+    // Rechazar y seguir escaneando es seguro incluso ante un falso positivo:
+    // la selección se rehace en cada poll mientras no hay gamepad, así que un
+    // control real que arrancó con el stick a fondo entra apenas lo sueltan.
+    private static unsafe bool AxesLookPinned(float* axsPtr, int axsCount) =>
+        axsCount >= 2
+        && Math.Abs(axsPtr[0]) >= PinnedAxisThreshold
+        && Math.Abs(axsPtr[1]) >= PinnedAxisThreshold;
+
     // Joysticks-shaped que no son gamepads (teclados/mouse con botones programables
     // que el kernel también expone como /dev/input/js*). Crece con cada caso real.
     private static bool IsKnownNotGamepad(string name) =>
-        name.Contains("Keychron", StringComparison.OrdinalIgnoreCase);
+        name.Contains("Keychron",       StringComparison.OrdinalIgnoreCase) ||
+        name.Contains("LED Controller", StringComparison.OrdinalIgnoreCase);
 
     // SHANWAN PS3 DInput modes: 4 axes + triggers como botones. No pasan el
     // filtro estándar de MinExpectedAxes=6, hay que matchearlos por nombre.
@@ -209,6 +306,23 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         {
             ReleaseGamepad("null pointer from GLFW");
             return GamepadState.Disconnected;
+        }
+
+        if (!manualSelection && pollsSinceConnect < PhantomGuardPolls)
+        {
+            pollsSinceConnect++;
+            if (AxesLookPinned(axsPtr, axsCount)) pinnedPollsSinceConnect++;
+            if (pollsSinceConnect >= PhantomGuardPolls
+                && pinnedPollsSinceConnect == pollsSinceConnect)
+            {
+                logger.Notification(
+                    $"GamepadCompanion: \"{DeviceName}\" held its sticks at the extreme " +
+                    $"for {PhantomGuardPolls} polls straight ({FormatAxes(axsPtr, axsCount)}) " +
+                    $"— treating it as a phantom device and rescanning. " +
+                    $"Use .gpdevice if this is really your gamepad.");
+                ReleaseGamepad("sticks pinned since connect");
+                return GamepadState.Disconnected;
+            }
         }
 
         DetectLayout(axsPtr, axsCount, btnCount, DeviceName ?? string.Empty);
@@ -460,6 +574,39 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         return result;
     }
 
+    public unsafe IReadOnlyList<GamepadDeviceInfo> ScanDevices()
+    {
+        var found = new List<GamepadDeviceInfo>();
+        for (int jid = 0; jid < MaxJoysticks; jid++)
+        {
+            if (!GLFW.JoystickPresent(jid)) continue;
+            string name = GLFW.GetJoystickName(jid) ?? "<unknown>";
+            _ = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
+            float* axsPtr = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
+            _ = GLFW.GetJoystickHatsRaw(jid, out int hatCount);
+            string? reject = RejectReason(name, btnCount, axsCount, axsPtr);
+            found.Add(new GamepadDeviceInfo(jid, name, btnCount, axsCount, hatCount,
+                                            reject is null, reject, jid == joystickId));
+        }
+        return found;
+    }
+
+    public bool SelectDevice(int jid)
+    {
+        if (jid < 0 || jid >= MaxJoysticks || !GLFW.JoystickPresent(jid)) return false;
+        string name = GLFW.GetJoystickName(jid) ?? "<unknown>";
+        if (joystickId.HasValue) ReleaseGamepad("switching device");
+        PreferredDeviceName = name;
+        AcceptGamepad(jid, name, "manual selection", manual: true);
+        return true;
+    }
+
+    public void ResetSelection()
+    {
+        PreferredDeviceName = null;
+        if (joystickId.HasValue) ReleaseGamepad("selection reset");
+    }
+
     private void ReleaseGamepad(string reason)
     {
         if (joystickId is int jid)
@@ -470,9 +617,12 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         ltRangeSigned = false;
         rtRangeSigned = false;
         layout = AxisLayout.Unknown;
+        manualSelection = false;
+        pollsSinceConnect = 0;
+        pinnedPollsSinceConnect = 0;
     }
 
-    private unsafe void LogDiagnosticScan()
+    private unsafe void LogDiagnosticScan(string label)
     {
         bool foundAny = false;
         for (int jid = 0; jid < MaxJoysticks; jid++)
@@ -482,14 +632,17 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             string name = GLFW.GetJoystickName(jid) ?? "<null>";
             string guid = GLFW.GetJoystickGUID(jid) ?? "<null>";
             _ = GLFW.GetJoystickButtonsRaw(jid, out int btnCount);
-            _ = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
+            float* axsPtr = GLFW.GetJoystickAxesRaw(jid, out int axsCount);
             _ = GLFW.GetJoystickHatsRaw(jid, out int hatCount);
+            string verdict = jid == joystickId
+                ? "SELECTED"
+                : RejectReason(name, btnCount, axsCount, axsPtr) ?? "eligible";
             logger.Notification(
-                $"GamepadCompanion: scan jid={jid} name=\"{name}\" guid={guid} " +
-                $"buttons={btnCount} axes={axsCount} hats={hatCount}");
+                $"GamepadCompanion: {label} jid={jid} name=\"{name}\" guid={guid} " +
+                $"buttons={btnCount} axes={axsCount} hats={hatCount} — {verdict}");
         }
         if (!foundAny)
-            logger.Notification("GamepadCompanion: scan found no joysticks present");
+            logger.Notification($"GamepadCompanion: {label} found no joysticks present");
     }
 
     private void OnGlfwError(ErrorCode error, string description)

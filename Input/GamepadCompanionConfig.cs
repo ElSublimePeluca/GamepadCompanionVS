@@ -23,6 +23,13 @@ public sealed class GamepadCompanionConfig
     // clicks del cursor virtual por igual.
     public bool  SwapTriggers     { get; set; } = false;
 
+    // Device fijado a mano con .gpdevice: substring del nombre que reporta
+    // GLFW (case-insensitive). null = autodetección. Sirve cuando hay más de
+    // un joystick enchufado y el mod elige el que no es — típicamente algún
+    // HID que no es un gamepad pero tiene forma de gamepad (controladoras RGB
+    // de placa madre, teclados con teclas programables).
+    public string? PreferredDevice { get; set; } = null;
+
     // Slots de la rueda radial. null en el array entero significa "usar
     // defaults"; null en una posición significa "slot vacío". Length 8
     // cuando está poblado. La forma del SlotConfig es plana con

@@ -1,0 +1,37 @@
+GamepadCompanion v1.10.0
+
+Fixes
+
+- The character no longer walks and spins on its own when something that is not
+  a gamepad is plugged in. Reported by Lyn_ on SteamOS: stuck turning in
+  circles while looking up and to the left, with the controller itself ignored
+  — sometimes it was picked up after a relaunch, sometimes not.
+
+  The mod took the first joystick the system offered it, and the system does
+  not only call gamepads joysticks. On that machine the first one was the
+  motherboard's RGB lighting controller, which reports twelve buttons and ten
+  axes — gamepad-shaped enough to be chosen — and holds every one of those axes
+  at its extreme forever. Read as a gamepad, that is both sticks pushed hard
+  into a corner and held there: walk forward-left, camera up-left, no way to
+  stop it. The real controller was never even looked at, which is why input
+  came and went with whatever order the system happened to enumerate devices
+  in.
+
+  Devices are now checked before being adopted: a resting gamepad has its
+  sticks near centre, so one that starts with them pinned at the extreme is
+  skipped and the scan moves on. The check repeats every frame while no gamepad
+  is connected, so a real controller that was being held at the time is taken
+  as soon as it is let go, and a device that only misbehaves after connecting
+  is dropped within a couple of seconds.
+
+New
+
+- `.gpdevice` lists every joystick the game can see, says which one is in use
+  and why the others were skipped. `.gpdevice <number>` forces a specific one
+  and remembers it for future sessions; `.gpdevice auto` goes back to
+  autodetection. No heuristic can recognise every gamepad-shaped device that
+  exists, so when the guess is wrong there is now a way to say so.
+
+- The client log records all joysticks present at the moment one is adopted,
+  not just the one that was chosen. A bug report is now enough on its own to
+  tell whether the right device was picked.

@@ -1,0 +1,48 @@
+GamepadCompanion v1.8.1
+
+Fixes
+
+- RKN Crafting now works with the hold-key binding added in 1.8.0. Reported by
+  pngwn: binding LAlt to A worked, but holding A and pulling LT never started a
+  craft — while Alt + right click on keyboard and mouse did.
+
+  The cause was mine, not RKN's. Vintage Story binds "Lock/Unlock Mouse Cursor"
+  to Left Alt, which is exactly the key RKN uses as its crafting modifier.
+  Holding Alt therefore frees the mouse — that is normal vanilla behaviour, and
+  RKN depends on it. But version 1.7.1 had added a repair routine for the "left
+  trigger curse" that looked for precisely that state — mouse free, no dialog
+  open, free-mouse key registered as pressed — and treated it as a key stuck by
+  a lost key-release event. So the moment you pulled the trigger, the mod
+  cleared the Alt key a fraction of a second before the click reached RKN, and
+  RKN saw a plain right click. Keyboard and mouse were never affected, because
+  that repair routine only ever runs on a gamepad trigger press.
+
+  The repair routine now leaves a key alone when something owns it: either a
+  hold binding of this mod, or your physical keyboard (checked against the OS,
+  not against the game's own state). A genuinely stuck key — where the game
+  thinks it is pressed and the OS says it is not — is still repaired, and in
+  fact detected more reliably than before.
+
+- Holding a modifier and pulling a trigger on the same frame no longer drops the
+  modifier. Key holds are now pressed before the click stage and released after
+  it, so the modifier is alive for both the press and the release of the click.
+
+- Assigning a bare modifier (Alt, Ctrl, Shift) always creates a hold binding
+  now, even if you picked the single-key row. A tap of a modifier key is never
+  useful, and picking the wrong row produced the exact same symptom as the bug
+  above for a completely different reason.
+
+Notes
+
+- While you hold Alt, the right stick will not turn the camera and the mouse
+  cursor is free. That is vanilla behaviour, not the mod — the same thing
+  happens when you hold Alt on a keyboard, and RKN's in-world slot HUD needs it.
+  Your aim stays at the centre of the screen as long as you do not move the
+  physical mouse.
+
+Other
+
+- The two key rows in the action picker now describe what they do instead of
+  both starting with "Assign a key...". English and Spanish.
+- .gptrace now logs which keys are being held by a binding (hold=A:AltLeft).
+- README documents hold bindings and the RKN Crafting recipe.
