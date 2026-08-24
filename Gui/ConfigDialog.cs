@@ -18,7 +18,10 @@ public sealed class ConfigDialog : GuiDialog
 {
     private const double DialogW    = 480;
     private const double DialogH    = 580;
-    private const double TitleH     = 30;
+    // El fondo del dialog reserva exactamente GuiStyle.TitleBarHeight arriba
+    // (GuiElementDialogBackground), así que la barra tiene que medir eso o
+    // queda una costura de 1px entre la barra y el cuerpo.
+    private static readonly double TitleH = GuiStyle.TitleBarHeight;
     private const double TabBarH    = 30;
     private const double FooterH    = 36;
     private const double Margin     = 16;
@@ -160,8 +163,12 @@ public sealed class ConfigDialog : GuiDialog
     {
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
             .WithAlignment(EnumDialogArea.CenterMiddle);
+        // Sin FitToChildren a propósito: DialogW/alto ya incluyen los
+        // márgenes, y shrink-wrapear el fondo al contenido le comía el
+        // margen derecho e inferior mientras el title bar conservaba el
+        // ancho declarado — el fondo quedaba más angosto que la barra y
+        // asomaba por la derecha (issue #7).
         var bgBounds = ElementBounds.Fixed(0, 0, DialogW, DialogH);
-        bgBounds.BothSizing = ElementSizing.FitToChildren;
 
         var titleBarBounds = ElementBounds.Fixed(0, 0, DialogW, TitleH);
         var tabBarBounds = ElementBounds.Fixed(
@@ -235,8 +242,12 @@ public sealed class ConfigDialog : GuiDialog
             var btnBounds = ElementBounds
                 .Fixed(Margin + WheelSlotLabelW + 8, y, WheelSlotBtnW, WheelRowH);
 
-            string slotLabel = bindings[slot]?.Label
-                               ?? Lang.Get("gamepadcompanion:entry-none");
+            // Los labels vienen de hotkeys de terceros y de composites de
+            // hasta 4 pasos: sin recortar, el botón crece solo y se sale del
+            // panel. Ver GuiTextFit.
+            string slotLabel = GuiTextFit.EllipsizeButton(
+                bindings[slot]?.Label ?? Lang.Get("gamepadcompanion:entry-none"),
+                WheelSlotBtnW);
 
             compo.AddStaticText(Lang.Get("gamepadcompanion:slot-label", slot + 1),
                                 CairoFont.WhiteSmallText(), labelBounds);
@@ -279,8 +290,10 @@ public sealed class ConfigDialog : GuiDialog
             var btnBounds = ElementBounds
                 .Fixed(Margin + BtnLabelW + 8, y, BtnPickerW, BtnRowH);
 
-            string current = buttonBindings[thisBtn]?.Label
-                             ?? Lang.Get("gamepadcompanion:button-default");
+            string current = GuiTextFit.EllipsizeButton(
+                buttonBindings[thisBtn]?.Label
+                    ?? Lang.Get("gamepadcompanion:button-default"),
+                BtnPickerW);
 
             compo.AddStaticText(ButtonDisplayName(thisBtn),
                                 CairoFont.WhiteSmallText(), labelBounds);

@@ -23,10 +23,11 @@ namespace GamepadCompanion.Gui;
 public sealed class KeyCaptureDialog : GuiDialog
 {
     private const double DialogW = 360;
-    private const double DialogH = 140;
-    private const double TitleH  = 30;
+    // GuiStyle.TitleBarHeight es lo que el fondo reserva arriba (issue #7).
+    private static readonly double TitleH = GuiStyle.TitleBarHeight;
     private const double Margin  = 16;
-    private const double BodyH   = 40;
+    // Piso del área del prompt; el alto real sale de medir el texto.
+    private const double MinBodyH = 24;
     private const double FooterH = 36;
 
     private readonly Action<IGameAction?> onPicked;
@@ -53,14 +54,34 @@ public sealed class KeyCaptureDialog : GuiDialog
     {
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
             .WithAlignment(EnumDialogArea.CenterMiddle);
-        var bgBounds = ElementBounds.Fixed(0, 0, DialogW, DialogH);
-        bgBounds.BothSizing = ElementSizing.FitToChildren;
+
+        // GuiElementStaticText wrappea solo al ancho del bound
+        // (AutobreakAndDrawMultilineTextAt) pero dibuja igual aunque no entre
+        // a lo alto, así que un alto fijo dejaba el prompt en español metido
+        // abajo del botón Cancelar. Medimos las líneas reales y el dialog
+        // crece con el texto.
+        string prompt = Lang.Get(holdMode
+            ? "gamepadcompanion:capture-hold-prompt"
+            : "gamepadcompanion:capture-key-prompt");
+        double bodyW = DialogW - 2 * Margin;
+        double scale = RuntimeEnv.GUIScale;
+        if (scale <= 0) scale = 1;
+        double bodyH = Math.Max(MinBodyH,
+            capi.Gui.Text.GetMultilineTextHeight(
+                CairoFont.WhiteSmallText(), prompt, GuiElement.scaled(bodyW)) / scale);
+
+        var bodyBounds = ElementBounds.Fixed(
+            Margin, TitleH + Margin, bodyW, bodyH);
+        double dialogH = TitleH + Margin + bodyH + Margin + FooterH + Margin;
+
+        // Nada de FitToChildren acá: shrink-wrapear el fondo al contenido
+        // le come el margen derecho/inferior y lo deja más angosto que el
+        // title bar. Ver ConfigDialog.Compose (issue #7).
+        var bgBounds = ElementBounds.Fixed(0, 0, DialogW, dialogH);
 
         var titleBarBounds = ElementBounds.Fixed(0, 0, DialogW, TitleH);
-        var bodyBounds = ElementBounds.Fixed(
-            Margin, TitleH + Margin, DialogW - 2 * Margin, BodyH);
         var cancelBounds = ElementBounds.Fixed(
-            Margin, DialogH - FooterH - Margin,
+            Margin, bodyBounds.fixedY + bodyH + Margin,
             DialogW - 2 * Margin, FooterH);
 
         SingleComposer = capi.Gui
@@ -71,9 +92,7 @@ public sealed class KeyCaptureDialog : GuiDialog
                                    : "gamepadcompanion:capture-key-title"),
                                OnCancel, bounds: titleBarBounds)
             .BeginChildElements(bgBounds)
-            .AddStaticText(Lang.Get(holdMode
-                               ? "gamepadcompanion:capture-hold-prompt"
-                               : "gamepadcompanion:capture-key-prompt"),
+            .AddStaticText(prompt,
                            CairoFont.WhiteSmallText(),
                            EnumTextOrientation.Center,
                            bodyBounds)

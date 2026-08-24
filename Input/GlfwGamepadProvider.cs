@@ -23,12 +23,24 @@ namespace GamepadCompanion.Input;
 //                 (LT) — chequeando los dos a la vez se evita el falso match.
 //                 axes: LX,LY,RX,LT,RT,RY (0..5)
 //                 face buttons: Square,Cross,Circle,Triangle (raw 0..3)
-//   GameSirPs4  — GameSir Cyclone 2 en modo PS4 (probablemente otros del
-//                 mismo fabricante). Firma: nombre contiene "Chicken Run"
-//                 (manufacturer Guangzhou Chicken Run Network Technology
-//                 = casa matriz de GameSir) o "GameSir". No se puede
-//                 detectar por axes solos porque comparte la firma de
-//                 triggers signed a2/a5 con xpad clásico.
+//   SonyDs      — Familia DualShock/DualSense manejada por el driver Sony del
+//                 kernel (hid-sony / hid-playstation), y todo lo que se hace
+//                 pasar por uno: GameSir Cyclone 2 en modo PS4 por USB (donde
+//                 el nombre delata al fabricante) y también por Bluetooth
+//                 (donde se presenta como "Wireless Controller" con el
+//                 VID/PID de Sony, porque un control PS4 tiene que hacerlo
+//                 para que la consola lo acepte).
+//                 El orden de botones es el de evdev: BTN_SOUTH, EAST,
+//                 NORTH, WEST, TL, TR, TL2, TR2, SELECT, START, MODE,
+//                 THUMBL, THUMBR = 13 reales. xpad expone 11 (no tiene
+//                 TL2/TR2), y esos dos de más corren Share/Options/PS/L3/R3
+//                 de raw 6..10 a raw 8..12 — de ahí que con el fallback xpad
+//                 los gatillos disparen Back/Start y los botones centrales
+//                 caigan en Guide/L3/R3.
+//                 Firma: vendor 0x054C en el GUID, o bien 6 axes con los
+//                 triggers signed en a2/a5 (igual que xpad) pero 13 botones
+//                 reales en vez de 11. Por nombre no alcanza: por BT el
+//                 nombre es genérico.
 //                 axes: LX,LY,LT,RX,RY,RT (0..5) — igual a xpad
 //                 face buttons: raw 0=A, 1=B, 2=Y, 3=X (X/Y swapped
 //                 contra xpad en raw 2/3; A y B sí siguen xpad)
@@ -82,9 +94,15 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
 
     private const int XboxBtHidMinButtons = 15;
 
+    // Botones reales (sin contar los 4 que GLFW agrega por hat) que expone
+    // un DualShock vía el driver Sony del kernel: 11 de xpad + L2/R2 en
+    // versión digital (BTN_TL2/BTN_TR2).
+    private const int SonyDsMinRealButtons = 13;
+    private const int SonyVendorId = 0x054C;
+
     private enum AxisLayout
     {
-        Unknown, Xpad, Ds4Amazon, GameSirPs4, WinXInput, XdGamepad, XboxBtHid,
+        Unknown, Xpad, Ds4Amazon, SonyDs, WinXInput, XdGamepad, XboxBtHid,
     }
 
     // bit-index (orden GamepadButton) → raw button index. 11 entradas:
@@ -92,7 +110,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     private static readonly int[] Ds4AmazonButtonMap = {
         1,  2,  0,  3,  4,  5,  8,  9, 10, 11, 12,
     };
-    private static readonly int[] GameSirPs4ButtonMap = {
+    private static readonly int[] SonyDsButtonMap = {
         0,  1,  3,  2,  4,  5,  8,  9, 10, 11, 12,
     };
     // GLFW en Windows XInput omite la tecla Guide (XInput la reserva al
@@ -325,7 +343,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             }
         }
 
-        DetectLayout(axsPtr, axsCount, btnCount, DeviceName ?? string.Empty);
+        DetectLayout(jid, axsPtr, axsCount, btnCount, DeviceName ?? string.Empty);
 
         ushort bits = ReadFaceButtons(btnPtr, btnCount);
 
@@ -360,7 +378,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             case AxisLayout.Ds4Amazon:
                 idxLT = 3; idxRT = 4; idxRX = 2; idxRY = 5;
                 break;
-            case AxisLayout.GameSirPs4:
+            case AxisLayout.SonyDs:
                 idxLT = 2; idxRT = 5; idxRX = 3; idxRY = 4;
                 break;
             case AxisLayout.WinXInput:
@@ -410,17 +428,23 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     // Orden de chequeo (priorizamos signals más específicos):
     //   1. Nombre matchea X-D GamePad / SHANWAN → XdGamepad. Necesario por
     //      nombre porque tiene solo 4 axes (no hay firma de ejes que sirva).
-    //   2. Nombre matchea GameSir/Chicken Run → GameSirPs4. Necesario por
-    //      nombre porque su firma de ejes (signed triggers a2/a5) coincide
-    //      con xpad clásico de Linux.
+    //   2. Nombre matchea GameSir/Chicken Run → SonyDs. Es el atajo para el
+    //      Cyclone 2 por USB, donde el nombre trae al fabricante; por
+    //      Bluetooth el nombre es genérico y lo agarra el paso 6.
     //   3. a3 Y a4 ambos < -0.9 al primer poll → Ds4Amazon. Los dos triggers
     //      están signed en posiciones 3/4 y en reposo reportan -1.
-    //   4. a4 < -0.9 pero a3 NO < -0.9 al primer poll → WinXInput. Solo LT
+    //   4. Lo mismo que 5 pero con btnCount >= 15 → XboxBtHid.
+    //   5. a4 < -0.9 pero a3 NO < -0.9 al primer poll → WinXInput. Solo LT
     //      está signed a -1 (RY=a3 está en 0 al reposo). El check de a3 alto
     //      excluye Ds4Amazon (donde a3 también está en -1).
-    //   5. Default → Xpad. Logueamos los ejes para diagnóstico de layouts
+    //   6. Vendor Sony en el GUID, o la forma del DualShock en Linux: 6 axes
+    //      con triggers signed en a2/a5 (igual que xpad) pero 13 botones
+    //      reales en vez de 11. Va DESPUÉS de Ds4Amazon a propósito: ese
+    //      clon también se hace pasar por Sony, y se distingue solo por los
+    //      ejes (triggers en a3/a4 en vez de a2/a5).
+    //   7. Default → Xpad. Logueamos los ejes para diagnóstico de layouts
     //      futuros que caigan acá sin firma conocida.
-    private unsafe void DetectLayout(float* axsPtr, int axsCount, int btnCount,
+    private unsafe void DetectLayout(int jid, float* axsPtr, int axsCount, int btnCount,
                                      string deviceName)
     {
         if (layout != AxisLayout.Unknown) return;
@@ -439,11 +463,11 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         if (deviceName.Contains("Chicken Run", StringComparison.OrdinalIgnoreCase) ||
             deviceName.Contains("GameSir",     StringComparison.OrdinalIgnoreCase))
         {
-            layout = AxisLayout.GameSirPs4;
+            layout = AxisLayout.SonyDs;
             ltRangeSigned = true;
             rtRangeSigned = true;
             logger.Notification(
-                $"GamepadCompanion: detected GameSirPs4 layout by name " +
+                $"GamepadCompanion: detected SonyDs layout by name " +
                 $"(btnCount={btnCount}, axes={axesDump})");
             return;
         }
@@ -489,11 +513,53 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             return;
         }
 
+        // GLFW agrega 4 botones sintéticos por cada hat, así que para comparar
+        // contra el conteo real del device hay que descontarlos.
+        _ = GLFW.GetJoystickHatsRaw(jid, out int hatCount);
+        int realButtons = btnCount - 4 * Math.Max(0, hatCount);
+        string guid = GLFW.GetJoystickGUID(jid) ?? string.Empty;
+        int vendor = VendorIdFromGuid(guid);
+        bool sonyVendor = vendor == SonyVendorId;
+        bool sonyShape = axsCount > 5
+                         && realButtons >= SonyDsMinRealButtons
+                         && axsPtr[2] < Ds4LayoutThreshold
+                         && axsPtr[5] < Ds4LayoutThreshold;
+        if (sonyVendor || sonyShape)
+        {
+            layout = AxisLayout.SonyDs;
+            ltRangeSigned = true;
+            rtRangeSigned = true;
+            logger.Notification(
+                $"GamepadCompanion: detected SonyDs layout by " +
+                $"{(sonyVendor ? $"vendor 0x{vendor:X4} in guid={guid}" : "DualShock button shape")} " +
+                $"(btnCount={btnCount}, hats={hatCount}, realButtons={realButtons}, " +
+                $"axes={axesDump})");
+            return;
+        }
+
         layout = AxisLayout.Xpad;
         logger.Notification(
             $"GamepadCompanion: detected Xpad layout (default fallback) " +
-            $"(btnCount={btnCount}, axes={axesDump})");
+            $"(btnCount={btnCount}, hats={hatCount}, realButtons={realButtons}, " +
+            $"guid={guid}, axes={axesDump})");
     }
+
+    // El GUID que da GLFW es el de SDL: 16 bytes en hex, con el vendor USB
+    // little-endian en los bytes 4-5 (o sea los chars 8..11). "0500 0000
+    // 4c05 0000 c405 ..." → vendor 0x054C (Sony), product 0x05C4 (DS4).
+    private static int VendorIdFromGuid(string guid)
+    {
+        if (guid.Length < 12) return 0;
+        return TryHexByte(guid, 10, out int hi) && TryHexByte(guid, 8, out int lo)
+            ? (hi << 8) | lo
+            : 0;
+    }
+
+    private static bool TryHexByte(string s, int at, out int value) =>
+        int.TryParse(s.AsSpan(at, 2),
+                     System.Globalization.NumberStyles.HexNumber,
+                     System.Globalization.CultureInfo.InvariantCulture,
+                     out value);
 
     private static unsafe string FormatAxes(float* axsPtr, int axsCount)
     {
@@ -515,7 +581,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
         int[]? map = layout switch
         {
             AxisLayout.Ds4Amazon  => Ds4AmazonButtonMap,
-            AxisLayout.GameSirPs4 => GameSirPs4ButtonMap,
+            AxisLayout.SonyDs     => SonyDsButtonMap,
             AxisLayout.WinXInput  => WinXInputButtonMap,
             AxisLayout.XdGamepad  => XdGamepadButtonMap,
             AxisLayout.XboxBtHid  => XboxBtHidButtonMap,

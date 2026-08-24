@@ -1,0 +1,67 @@
+GamepadCompanion v1.11.0
+
+Fixes
+
+- Controllers that identify themselves as a DualShock are mapped correctly
+  again. Reported with a GameSir Cyclone 2 in PS4 mode over Bluetooth: the
+  central buttons no longer paused or opened the map, one of them toggled a
+  modifier instead, and the triggers fired pause and map on top of their own
+  job.
+
+  In PS4 mode a controller has to present the console with Sony's own vendor
+  and product id, or the console refuses it. Over USB the manufacturer string
+  survives and the mod recognised the pad by name; over Bluetooth nothing is
+  left but "Wireless Controller" and a DualShock 4 id, so the mod fell back to
+  the layout it assumes when it knows nothing — the classic Linux xpad one.
+
+  Those two layouts differ by exactly two buttons. The Sony driver exposes L2
+  and R2 a second time as plain digital buttons, which xpad does not have, and
+  that pair pushes everything after it two places along: Share, Options, PS and
+  the two stick clicks land where xpad puts Back, Start, Guide and the stick
+  clicks. Read with the wrong layout, squeezing a trigger also pressed the
+  button that opens the map or pauses the game, Options toggled Ctrl, the PS
+  button toggled Shift, clicking the sticks did nothing at all, and X and Y
+  were swapped.
+
+  Recognition no longer depends on the name. A pad is now read as a DualShock
+  when it reports Sony's vendor id, or when it has the shape of one: six axes
+  with both triggers resting at -1, and thirteen real buttons where xpad has
+  eleven. This covers actual DualShock 3, 4 and DualSense pads on Linux as well
+  as anything wearing their id. Controllers that were already working are
+  untouched — an Xbox pad on xpad reports eleven buttons and still takes the
+  xpad path.
+
+  When a controller does end up on the fallback, the log line now carries its
+  guid, its hat count and its real button count, which is what was missing to
+  diagnose this in one pass instead of two.
+
+- The Ctrl, Shift and precision indicators no longer sit on top of the minimap.
+  Reported by nolepguy (#6). Both were pinned to the top right corner. When the
+  minimap is in that corner the indicators now tuck in just underneath it, with
+  their right edge lined up against its own; if the minimap is somewhere else,
+  or turned off, they stay where they always were. Opening the full-screen map
+  does not make them jump, and they follow the minimap if you move it.
+
+- Dialog panels are no longer narrower than their own title bar. Reported by
+  nolepguy (#7).
+
+  Every dialog in the mod declared a size that already included its margins,
+  and then asked the background to shrink-wrap itself around its contents. The
+  background obliged, which quietly ate the right and bottom margin, while the
+  title bar kept the declared width — so the bar overhung the panel by sixteen
+  pixels on the right, the footer button sat flush against the bottom edge, and
+  in the virtual keyboard the title sat off-centre. The backgrounds now use the
+  size they declare. The title bar height also follows the game's own constant
+  instead of a hardcoded value one pixel short of it.
+
+- Long action names no longer spill off the settings panel. A button in Vintage
+  Story grows itself so its label fits on one line, and nothing clips it
+  afterwards, so a wheel slot bound to a composite of several actions painted
+  its right half over the world outside the dialog. Labels are now measured and
+  trimmed to the space available before they are handed over. Affects the wheel
+  and gamepad button tabs, the composite builder, and the action picker list.
+
+- The key capture dialog grows to fit its prompt. The prompt wraps to two lines
+  in Spanish, and in "hold key" mode in English as well, but the dialog was a
+  fixed height — so the second line was drawn underneath the Cancel button. The
+  height is now measured from the text.

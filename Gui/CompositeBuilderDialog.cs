@@ -17,7 +17,8 @@ public sealed class CompositeBuilderDialog : GuiDialog
 {
     public  const int    MaxSteps    = 4;
     private const double DialogW     = 460;
-    private const double TitleH      = 30;
+    // GuiStyle.TitleBarHeight es lo que el fondo reserva arriba (issue #7).
+    private static readonly double TitleH = GuiStyle.TitleBarHeight;
     private const double Margin      = 16;
     private const double RowH        = 32;
     private const double RowGap      = 6;
@@ -65,8 +66,10 @@ public sealed class CompositeBuilderDialog : GuiDialog
         double bodyY = TitleH + Margin;
         double totalH = bodyY + MaxSteps * (RowH + RowGap) + Margin
                               + FooterH + Margin;
+        // Nada de FitToChildren acá: shrink-wrapear el fondo al contenido
+        // le come el margen derecho/inferior y lo deja más angosto que el
+        // title bar. Ver ConfigDialog.Compose (issue #7).
         var bgBounds = ElementBounds.Fixed(0, 0, DialogW, totalH);
-        bgBounds.BothSizing = ElementSizing.FitToChildren;
 
         var titleBarBounds = ElementBounds.Fixed(0, 0, DialogW, TitleH);
 
@@ -87,8 +90,9 @@ public sealed class CompositeBuilderDialog : GuiDialog
                 .Fixed(Margin + LabelW + 8, y,
                        DialogW - 2 * Margin - LabelW - 8, RowH);
 
-            string stepLabel = steps[i]?.Label
-                               ?? Lang.Get("gamepadcompanion:entry-empty");
+            string stepLabel = GuiTextFit.EllipsizeButton(
+                steps[i]?.Label ?? Lang.Get("gamepadcompanion:entry-empty"),
+                DialogW - 2 * Margin - LabelW - 8);
 
             compo.AddStaticText(Lang.Get("gamepadcompanion:step-label", i + 1),
                                 CairoFont.WhiteSmallText(), labelBounds);

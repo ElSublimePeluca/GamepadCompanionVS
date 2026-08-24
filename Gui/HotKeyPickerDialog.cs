@@ -36,7 +36,8 @@ public sealed class HotKeyPickerDialog : GuiDialog
 {
     private const int    VisibleRows   = 18;
     private const double DialogW       = 460;
-    private const double TitleH        = 30;
+    // GuiStyle.TitleBarHeight es lo que el fondo reserva arriba (issue #7).
+    private static readonly double TitleH = GuiStyle.TitleBarHeight;
     private const double Margin        = 16;
     private const double SearchH       = 30;
     private const double RowH          = 24;
@@ -104,8 +105,10 @@ public sealed class HotKeyPickerDialog : GuiDialog
     private void ComposeFrame()
     {
         var dialogBounds = NewDialogBounds();
+        // Nada de FitToChildren acá: shrink-wrapear el fondo al contenido
+        // le come el margen derecho/inferior y lo deja más angosto que el
+        // title bar. Ver ConfigDialog.Compose (issue #7).
         var bgBounds = ElementBounds.Fixed(0, 0, DialogW, TotalH);
-        bgBounds.BothSizing = ElementSizing.FitToChildren;
 
         var titleBarBounds = ElementBounds.Fixed(0, 0, DialogW, TitleH);
         var searchBounds = ElementBounds.Fixed(
@@ -183,6 +186,7 @@ public sealed class HotKeyPickerDialog : GuiDialog
                 Margin, ListAreaY + row * itemRowH, listW, RowH);
             string label = entryNames[idx];
             if (idx == currentSelectedIndex) label = "▸ " + label;
+            label = GuiTextFit.EllipsizeButton(label, listW, EnumButtonStyle.Small);
             compo.AddSmallButton(label, () => OnPicked(idx),
                                  bounds, EnumButtonStyle.Small);
         }

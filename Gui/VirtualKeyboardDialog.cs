@@ -78,8 +78,11 @@ public sealed class VirtualKeyboardDialog : GuiDialog
         var dialogBounds = ElementStdBounds.AutosizedMainDialog
             .WithAlignment(EnumDialogArea.CenterBottom)
             .WithFixedAlignmentOffset(0, -90);
+        // Nada de FitToChildren acá: shrink-wrapear el fondo al contenido le
+        // come el margen y lo deja más angosto que DialogW, y el título va
+        // centrado sobre DialogW — quedaba corrido. Ver ConfigDialog.Compose
+        // (issue #7).
         var bgBounds = ElementBounds.Fixed(0, 0, DialogW, totalH);
-        bgBounds.BothSizing = ElementSizing.FitToChildren;
 
         var titleBounds = ElementBounds.Fixed(0, 0, DialogW, TitleH);
 
