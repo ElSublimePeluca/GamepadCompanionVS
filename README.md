@@ -155,12 +155,17 @@ La puntería sigue siendo el centro de la pantalla mientras no muevas el mouse f
 
 ## Build desde código
 
-Requiere .NET 10 SDK y la variable de entorno `VINTAGE_STORY` apuntando al directorio de instalación de VS:
+Requiere .NET 10 SDK. Si tenés el juego en la ubicación por defecto (`~/.local/share/vintagestory` en Linux, `%appdata%/Vintagestory` en Windows) alcanza con:
 
 ```bash
-export VINTAGE_STORY=/opt/vintagestory   # o donde tengas VS instalado
 cd GamepadCompanion
 dotnet build
+```
+
+Si lo tenés en otro lado, apuntá la variable de entorno `VINTAGE_STORY` al directorio de instalación (el que contiene `VintagestoryAPI.dll`):
+
+```bash
+export VINTAGE_STORY=/ruta/a/vintagestory
 ```
 
 El output queda en `bin/Debug/Mods/mod/` — copiá esa carpeta (o usá `--addModPath` al iniciar VS) para probar.

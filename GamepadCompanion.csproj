@@ -8,6 +8,20 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Ubicacion de Vintage Story. Normalmente sale de la variable de entorno VINTAGE_STORY;
+       si no esta definida (o quedo apuntando a una instalacion que ya no existe) se prueban
+       las rutas por defecto de cada plataforma. Definir la propiedad aca tambien la deja
+       disponible para las macros de Properties/launchSettings.json. -->
+  <PropertyGroup>
+    <VINTAGE_STORY Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')">$(AppData)/Vintagestory</VINTAGE_STORY>
+    <VINTAGE_STORY Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')">$(HOME)/.local/share/vintagestory</VINTAGE_STORY>
+  </PropertyGroup>
+
+  <Target Name="VerifyVintageStoryPath" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')"
+           Text="Could not find a Vintage Story installation. Set the VINTAGE_STORY environment variable to the game directory (the one containing VintagestoryAPI.dll). Tried: '$(VINTAGE_STORY)'." />
+  </Target>
+
   <ItemGroup>
     <Reference Include="VintagestoryAPI">
       <HintPath>$(VINTAGE_STORY)/VintagestoryAPI.dll</HintPath>
