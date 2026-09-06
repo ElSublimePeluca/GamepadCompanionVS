@@ -1,5 +1,6 @@
 using System.Linq;
 using GamepadCompanion.Actions;
+using GamepadCompanion.Glyphs;
 using GamepadCompanion.Gui;
 using GamepadCompanion.Input;
 using GamepadCompanion.Toggles;
@@ -22,6 +23,7 @@ public class GamepadCompanionModSystem : ModSystem
     private GamepadCompanionConfig? config;
     private ToggleHudOverlay? toggleHud;
     private InputTracer? tracer;
+    private GlyphSession? glyphs;
 
     // Expone el driver para que helpers globales (BuiltinActions, etc.)
     // accedan a estado del input sin acoplarse al ModSystem en cada call.
@@ -40,7 +42,7 @@ public class GamepadCompanionModSystem : ModSystem
         // ModSystem se reinstancia en cada carga de mundo: rearmamos el espejo
         // para que un ClearAll() de la sesión anterior no lo deje apagado.
         ScreenInputMirror.Reset();
-        config = api.LoadModConfig<GamepadCompanionConfig>(ConfigFile) ?? new GamepadCompanionConfig();
+        config = LoadConfigSafe(api);
         api.StoreModConfig(config, ConfigFile);
 
         gamepad = new GlfwGamepadProvider(api.Logger)
@@ -50,7 +52,44 @@ public class GamepadCompanionModSystem : ModSystem
         driver = new GamepadInputDriver(api, config);
         tracer = new InputTracer(api, gamepad, driver.Toggles, driver.Cursor,
                                  driver.Buttons);
-        renderer = new GamepadRenderer(gamepad, driver, tracer);
+        // Los glifos van adentro de su propio try/catch que NUNCA relanza: si algo
+        // acá tira, StartClientSide se corta y el ModLoader saca al mod entero de
+        // enabledSystems (ni siquiera corre Dispose). Los hints valen bastante
+        // menos que el gamepad, así que en el peor caso arrancamos sin ellos.
+        try
+        {
+            glyphs = new GlyphSession(api, config, gamepad,
+                                      () => driver.Buttons.Bindings,
+                                      () => driver.Radial.Bindings,
+                                      Mod.Info.Version);
+            GlyphRuntime.Session = glyphs;
+            // El painter se registra SIEMPRE, con o sin mando: la decisión de
+            // dibujar glifo o ícono de vanilla se toma adentro del delegate
+            // leyendo estado vivo, así que enchufar el mando no re-registra
+            // nada, sólo dispara una recomposición.
+            new MouseIconOverride(api).Install();
+            glyphs.Icons.MarkActive();
+            var invalidator = new GlyphInvalidator(api, glyphs);
+            invalidator.Wire();
+            glyphs.Invalidator = invalidator;
+            // Los parches van al final: si algo de esto falla, lo que se pierde
+            // son las cápsulas de tecla, no los íconos de mouse ni el resto.
+            // ApplyOnce nunca relanza y nunca despatchea.
+            GlyphPatcher.ApplyOnce(api, glyphs, Mod.Info.ModID);
+        }
+        catch (System.Exception e)
+        {
+            // Los dos, o el painter seguiría dibujando contra una sesión que el
+            // resto del mod ya da por muerta.
+            glyphs = null;
+            GlyphRuntime.Clear();
+            api.Logger.Warning(
+                "GamepadCompanion: gamepad glyph hints could not start; " +
+                "the rest of the mod works normally.");
+            api.Logger.Warning(e);
+        }
+
+        renderer = new GamepadRenderer(gamepad, driver, tracer, InvalidateGlyphs);
         toggleHud = new ToggleHudOverlay(api, driver.Toggles);
 
         // Cargar bindings de la rueda desde config. Si el campo está null
@@ -83,7 +122,8 @@ public class GamepadCompanionModSystem : ModSystem
         api.Event.RegisterRenderer(cursorRenderer, EnumRenderStage.Done);
 
         // Hotkey nativo para abrir el dialog de config sin tener que tipear
-        // /gpconfig en chat. Default Insert (raramente usada). Rebindable
+        // .gpconfig en chat (comando de CLIENTE: punto, no barra). Default
+        // Insert (raramente usada). Rebindable
         // desde Settings > Controls. Bonus: como es una hotkey con Handler,
         // aparece en el dropdown de slots del propio dialog, así el usuario
         // puede asignarla al radial si quiere.
@@ -104,8 +144,89 @@ public class GamepadCompanionModSystem : ModSystem
         api.Event.LeaveWorld += OnLeaveWorld;
 
         RegisterCommands(api);
+        // Le preguntamos al engine cuáles quedaron REGISTRADOS de verdad, en vez
+        // de asumir que Create() alcanzó. Un comando que no aparece acá no
+        // existe para el chat, y sin este renglón la diferencia entre "no se
+        // registró" y "lo tipeaste distinto" no se puede ver desde el log.
+        LogRegisteredCommands(api);
 
         api.Logger.Notification("GamepadCompanion: client started, polling for gamepad");
+    }
+
+    // LoadModConfig es un JsonConvert.DeserializeObject pelado sobre el archivo
+    // (Vintagestory.Common.APIBase.LoadModConfig): una coma de más, un campo
+    // con el tipo cambiado o un enum con un valor que todavía no conocemos y
+    // tira DENTRO de StartClientSide. Eso no degrada nada, se lleva el mod
+    // ENTERO: el ModLoader saca al sistema de enabledSystems y deja un solo
+    // renglón en el log; y como Dispose recorre esa misma lista, tampoco corre
+    // la limpieza. El usuario ve el gamepad muerto sin ninguna pista.
+    //
+    // Acá lo bajamos a "arranca con los defaults". El backup del archivo va
+    // ANTES de devolver, porque el StoreModConfig que viene justo después lo
+    // pisa con los defaults y ese archivo es la única copia de la config del
+    // usuario. El nombre lleva fecha y hora para no tapar un backup anterior.
+    private static GamepadCompanionConfig LoadConfigSafe(ICoreClientAPI api)
+    {
+        try
+        {
+            return api.LoadModConfig<GamepadCompanionConfig>(ConfigFile)
+                   ?? new GamepadCompanionConfig();
+        }
+        catch (System.Exception e)
+        {
+            string path = System.IO.Path.Combine(GamePaths.ModConfig, ConfigFile);
+            string? backup = BackupBrokenConfig(api, path);
+            api.Logger.Error(
+                "GamepadCompanion: could not read {0}, starting with default " +
+                "settings. {1}", path,
+                backup is null
+                    ? "The unreadable file could NOT be backed up and is about " +
+                      "to be overwritten."
+                    : $"The unreadable file was kept as {backup}.");
+            api.Logger.Error(e);
+            return new GamepadCompanionConfig();
+        }
+    }
+
+    private static string? BackupBrokenConfig(ICoreClientAPI api, string path)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(path)) return null;
+            // Copy y no Move: si el StoreModConfig de después falla, que el
+            // usuario siga teniendo su archivo donde lo dejó.
+            string backup = $"{path}.{System.DateTime.Now:yyyyMMdd-HHmmss}.bak";
+            System.IO.File.Copy(path, backup, overwrite: true);
+            return backup;
+        }
+        catch (System.Exception e)
+        {
+            api.Logger.Warning(
+                "GamepadCompanion: could not back up the unreadable config.");
+            api.Logger.Warning(e);
+            return null;
+        }
+    }
+
+    private static void LogRegisteredCommands(ICoreClientAPI api)
+    {
+        try
+        {
+            var found = new System.Collections.Generic.List<string>();
+            foreach (var entry in api.ChatCommands)
+                if (entry.Key.StartsWith("gp", System.StringComparison.Ordinal))
+                    found.Add(entry.Key);
+            found.Sort(System.StringComparer.Ordinal);
+            api.Logger.Notification(
+                "GamepadCompanion: {0} chat commands registered (type them with a DOT, " +
+                "they are client commands): .{1}",
+                found.Count, string.Join("  .", found));
+        }
+        catch (System.Exception e)
+        {
+            api.Logger.Warning("GamepadCompanion: could not list the registered chat commands.");
+            api.Logger.Warning(e);
+        }
     }
 
     private void RegisterCommands(ICoreClientAPI api)
@@ -154,6 +275,7 @@ public class GamepadCompanionModSystem : ModSystem
                     gamepad.ResetSelection();
                     config!.PreferredDevice = null;
                     api.StoreModConfig(config, ConfigFile);
+                    InvalidateGlyphs();
                     return TextCommandResult.Success("gamepad device = auto");
                 }
 
@@ -164,6 +286,7 @@ public class GamepadCompanionModSystem : ModSystem
 
                 config!.PreferredDevice = gamepad.PreferredDeviceName;
                 api.StoreModConfig(config, ConfigFile);
+                InvalidateGlyphs();
                 return TextCommandResult.Success(
                     $"gamepad device = jid {jid}: {gamepad.DeviceName} (saved)");
             });
@@ -223,6 +346,8 @@ public class GamepadCompanionModSystem : ModSystem
             {
                 config!.SwapTriggers = !config.SwapTriggers;
                 api.StoreModConfig(config, ConfigFile);
+                // El mapa inverso tiene el gatillo de cada click cacheado.
+                InvalidateGlyphs();
                 return TextCommandResult.Success($"swap triggers = {config.SwapTriggers}");
             });
 
@@ -243,6 +368,48 @@ public class GamepadCompanionModSystem : ModSystem
                 api.Logger.Notification($"GamepadCompanion guis ({lines.Count}):\n  {text}");
                 return TextCommandResult.Success(
                     $"{lines.Count} dialogs logged to client log");
+            });
+
+        // Sin argumento: volcado completo del estado de los glifos, al chat y al
+        // log. Con argumento: fija la familia, la persiste y rearma el mapa.
+        // Misma forma que .gpdevice, que ya usa OptionalWord + StoreModConfig.
+        api.ChatCommands.Create("gpglyphs")
+            .WithDescription("Show gamepad glyph hint state, or set it: " +
+                             ".gpglyphs <off|auto|xbox|playstation|nintendo>")
+            .WithArgs(parsers.OptionalWord("style"))
+            .HandleWith(args =>
+            {
+                if (glyphs is null)
+                    return TextCommandResult.Error("glyph hints failed to start, see the client log");
+
+                string? arg = args[0] as string;
+                if (string.IsNullOrWhiteSpace(arg))
+                {
+                    // El log PRIMERO: si armar el volcado o el resumen tirara, al
+                    // menos queda constancia de que el comando corrió. Con el
+                    // orden inverso, un fallo acá se ve exactamente igual que un
+                    // comando que no existe.
+                    api.Logger.Notification("GamepadCompanion: .gpglyphs");
+                    string dump = GlyphDiagnostics.Describe(glyphs);
+                    api.Logger.Notification("GamepadCompanion:\n" + dump);
+                    return TextCommandResult.Success(GlyphDiagnostics.Summarize(glyphs));
+                }
+
+                // Parse tolerante, pero acá SÍ rechazamos lo que no entendemos:
+                // en el config una porquería tiene que degradar a "auto", pero un
+                // comando tipeado a mano tiene que decir que no se entendió, o el
+                // usuario cree que fijó playstation y le quedó auto.
+                var parsed = GlyphStyles.Parse(arg);
+                if (parsed == GlyphStyle.Auto &&
+                    !arg.Equals("auto", System.StringComparison.OrdinalIgnoreCase))
+                    return TextCommandResult.Error(
+                        $"unknown glyph style '{arg}' — use off, auto, xbox, playstation or nintendo");
+
+                config!.GlyphStyle = GlyphStyles.Serialize(parsed);
+                api.StoreModConfig(config, ConfigFile);
+                InvalidateGlyphs();
+                return TextCommandResult.Success(
+                    $"glyph style = {config.GlyphStyle} (showing: {glyphs.Resolver.Style})");
             });
 
         api.ChatCommands.Create("gpconfig")
@@ -286,10 +453,23 @@ public class GamepadCompanionModSystem : ModSystem
             $".gpdevice auto to undo.");
     }
 
+    // Un solo punto de invalidación: cualquier cosa que cambie qué botón hace
+    // qué tecla pasa por acá. Null-safe a propósito — si los glifos no
+    // arrancaron, el resto del mod sigue llamando a esto sin enterarse.
+    private void InvalidateGlyphs() => glyphs?.Resolver.Invalidate();
+
     private void OnLeaveWorld()
     {
         // ClientEventAPI.Trigger aísla las excepciones de los handlers, así
         // que si algo acá tira no se lleva puesto el teardown del juego.
+        //
+        // La sesión de glifos se suelta ACÁ y no sólo en Dispose: LeaveWorld sale
+        // de ClientMain.DestroyGameSession, así que cubre todos los caminos de
+        // salida, mientras que Dispose puede no correr nunca. Un delegate de
+        // CustomIcons — o, más adelante, un parche de Harmony — sigue instalado
+        // después del teardown, y con una sesión que apunta a un mundo muerto
+        // reventaría contra una API destruida.
+        GlyphRuntime.Clear();
         driver?.ReleaseAll();
         ScreenInputMirror.ClearAll();
     }
@@ -301,7 +481,7 @@ public class GamepadCompanionModSystem : ModSystem
     {
         if (capi is null || driver is null || config is null) return;
         new ConfigDialog(capi, driver.Radial.Bindings, driver.Buttons.Bindings,
-                         config, OnConfigChanged).TryOpen();
+                         config, glyphs, OnConfigChanged).TryOpen();
     }
 
     // Persiste todo el config (slots + sensibilidad). El dialog escribe
@@ -313,10 +493,18 @@ public class GamepadCompanionModSystem : ModSystem
         config.RadialSlots    = driver.Radial.Bindings.ToConfig();
         config.ButtonBindings = driver.Buttons.Bindings.ToConfig();
         capi.StoreModConfig(config, ConfigFile);
+        // Rebindear un botón cambia qué tecla muestra su glifo.
+        InvalidateGlyphs();
     }
 
     public override void Dispose()
     {
+        // Primero y aislado: soltar la sesión de glifos no puede quedar detrás
+        // de nada que pueda tirar, porque lo que sigue incluye el
+        // ScreenInputMirror.ClearAll() que destraba las teclas.
+        try { GlyphRuntime.Clear(); } catch { }
+        glyphs = null;
+
         if (capi is not null)
             capi.Event.LeaveWorld -= OnLeaveWorld;
         if (capi is not null && renderer is not null)

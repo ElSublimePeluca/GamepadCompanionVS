@@ -1,13 +1,14 @@
 using System.Collections.Generic;
+using System.Linq;
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Actions;
 
-// Deserialización compartida SlotConfig → IGameAction. La usan SlotBindings
-// (rueda) y ButtonBindings (overrides de botones), que persisten la misma
-// forma plana con discriminador.
+// Serialización compartida SlotConfig ⇄ IGameAction, en los dos sentidos. La
+// usan SlotBindings (rueda) y ButtonBindings (overrides de botones), que
+// persisten la misma forma plana con discriminador.
 //
 // Los labels NO se toman del snapshot persistido salvo como último recurso:
 // se re-resuelven en cada carga para que sigan el idioma activo del cliente.
@@ -94,4 +95,59 @@ internal static class SlotConfigActions
             return Lang.Get(key);
         return cfg.Label ?? cfg.DialogType!;
     }
+
+    // El camino de vuelta. Vive acá, y no una copia en cada dueño de bindings,
+    // porque las dos copias que había se desincronizaron: la de la rueda nunca
+    // aprendió "holdkey", así que un "mantener tecla" asignado a un slot caía
+    // en el `_ => null` y se BORRABA al guardar. Y no degradaba a tap: como
+    // HoldKeyAction no hereda de KeyPressAction, no lo agarraba ninguna otra
+    // rama. Con una sola copia, un tipo de acción nuevo se agrega en un solo
+    // lugar — o no anda en ninguno, que al menos se nota.
+    //
+    // Todo lo que ToAction sepa leer tiene que tener su rama acá; el
+    // discriminador `Type` es el mismo string de los dos lados.
+    public static SlotConfig? ToConfig(IGameAction? action) =>
+        action switch
+        {
+            HotKeyAction hk
+                => new SlotConfig { Type = "hotkey",
+                                    Code = hk.Code, Label = hk.Label },
+            OpenLoadedGuiAction og
+                => new SlotConfig { Type = "openDialog",
+                                    DialogType = og.DialogTypeName,
+                                    Label = og.Label },
+            BuiltinAction bi
+                => new SlotConfig { Type = "builtin",
+                                    Code = bi.Code, Label = bi.Label },
+            KeyPressAction kp
+                => new SlotConfig
+                   {
+                       Type = "keypress",
+                       KeyCode = kp.KeyCode,
+                       CtrlPressed = kp.CtrlPressed,
+                       ShiftPressed = kp.ShiftPressed,
+                       AltPressed = kp.AltPressed,
+                       Label = kp.Label,
+                   },
+            HoldKeyAction hd
+                => new SlotConfig
+                   {
+                       Type = "holdkey",
+                       KeyCode = hd.KeyCode,
+                       CtrlPressed = hd.CtrlPressed,
+                       ShiftPressed = hd.ShiftPressed,
+                       AltPressed = hd.AltPressed,
+                       Label = hd.Label,
+                   },
+            CompositeAction co
+                => new SlotConfig
+                   {
+                       Type = "composite",
+                       Label = co.Label,
+                       Children = co.Children
+                           .Select(c => ToConfig(c))
+                           .ToArray(),
+                   },
+            _   => null,
+        };
 }

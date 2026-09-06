@@ -1,0 +1,78 @@
+# gpclab apicheck — superficie de API del engine de la que dependen los glifos.
+# Generado con `dotnet run --project tools/gpclab -- apicheck --update`. No editar a mano.
+# Tomado contra VintagestoryAPI 1.22.7.0 / VintagestoryLib 1.22.7.0.
+# La versión del juego NO va en las líneas comparadas a propósito: un update que no
+# toca ninguna firma tiene que pasar sin ruido, o el chequeo se vuelve costumbre.
+VALUE  DrawWorldInteractionUtil (defaults del cartel) = UnscaledLineHeight=30 FontSize=20
+VALUE  GuiStyle.NormalFontSize = 30
+VALUE  GuiStyle.SmallFontSize = 16
+VALUE  GuiStyle.SmallishFontSize = 20
+VALUE  GuiStyle.StandardFontName = sans-serif
+Vintagestory.API.Client.CairoFont :: FIELD  public Double UnscaledFontsize
+Vintagestory.API.Client.CairoFont :: METHOD public CairoFont Clone()  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public CairoFont WithColor(Double[] color)  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public CairoFont WithFontSize(Single fontSize)  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public CairoFont WithStroke(Double[] color, Double width)  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public FontExtents GetFontExtents()  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public TextExtents GetTextExtents(String text)  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public Void SetupContext(Context ctx)  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public static CairoFont WhiteMediumText()  [decl:CairoFont]
+Vintagestory.API.Client.CairoFont :: METHOD public static CairoFont WhiteSmallText()  [decl:CairoFont]
+Vintagestory.API.Client.GuiElement :: METHOD public static Double scaled(Double value)  [decl:GuiElement]
+Vintagestory.API.Client.GuiElement :: METHOD public static Void RoundRectangle(Context ctx, Double x, Double y, Double width, Double height, Double radius)  [decl:GuiElement]
+Vintagestory.API.Client.GuiElementItemstackInfo :: FIELD  public ItemSlot curSlot
+Vintagestory.API.Client.GuiElementItemstackInfo :: METHOD public Boolean SetSourceSlot(ItemSlot nowSlot, Boolean forceRecompose = False)  [decl:GuiElementItemstackInfo]
+Vintagestory.API.Client.GuiStyle :: FIELD  public static Double NormalFontSize
+Vintagestory.API.Client.GuiStyle :: FIELD  public static Double SmallFontSize
+Vintagestory.API.Client.GuiStyle :: FIELD  public static Double SmallishFontSize
+Vintagestory.API.Client.GuiStyle :: FIELD  public static Double[] DarkBrownColor
+Vintagestory.API.Client.GuiStyle :: FIELD  public static Double[] DialogDefaultTextColor
+Vintagestory.API.Client.GuiStyle :: FIELD  public static String StandardFontName
+Vintagestory.API.Client.HotKey :: FIELD  public KeyCombination CurrentMapping
+Vintagestory.API.Client.HotKey :: FIELD  public String Code
+Vintagestory.API.Client.HotKey :: FIELD  public String Name
+Vintagestory.API.Client.HotkeyComponent :: FIELD  private HotKey hotkey
+Vintagestory.API.Client.HotkeyComponent :: FIELD  public String DisplayText
+Vintagestory.API.Client.HotkeyComponent :: METHOD public Void GenHotkeyTexture()  [decl:HotkeyComponent]
+Vintagestory.API.Client.HotkeyComponent :: METHOD public static Double DrawHotkey(ICoreClientAPI capi, String keycode, Double x, Double y, Context ctx, CairoFont font, Double lineheight, Double textHeight, Double pluswdith, Double symbolspacing, Double leftRightPadding, Double[] color)  [decl:HotkeyComponent]
+Vintagestory.API.Client.HotkeyComponent :: METHOD public virtual EnumCalcBoundsResult CalcBounds(TextFlowPath[] flowPath, Double currentLineHeight, Double offsetX, Double lineY, out Double nextOffsetX)  [decl:HotkeyComponent]
+Vintagestory.API.Client.IClientEventAPI :: EVENT  Action HotkeysChanged
+Vintagestory.API.Client.IInputAPI :: METHOD public abstract HotKey GetHotKeyByCode(String toggleKeyCombinationCode)  [decl:IInputAPI]
+Vintagestory.API.Client.IInputAPI :: PROP   OrderedDictionary<String,HotKey> HotKeys { public get; }
+Vintagestory.API.Client.IconComponent :: CTOR   public .ctor(ICoreClientAPI capi, String iconName, String iconPath, CairoFont font)
+Vintagestory.API.Client.IconComponent :: FIELD  public Double sizeMulSvg
+Vintagestory.API.Client.IconComponent :: METHOD public virtual EnumCalcBoundsResult CalcBounds(TextFlowPath[] flowPath, Double currentLineHeight, Double offsetX, Double lineY, out Double nextOffsetX)  [decl:IconComponent]
+Vintagestory.API.Client.IconComponent :: METHOD public virtual Void ComposeElements(Context ctx, ImageSurface surface)  [decl:IconComponent]
+Vintagestory.API.Client.IconRendererDelegate :: METHOD public virtual Void Invoke(Context ctx, Int32 x, Int32 y, Single w, Single h, Double[] rgba)  [decl:IconRendererDelegate]
+Vintagestory.API.Client.IconUtil :: FIELD  public Dictionary<String,IconRendererDelegate> CustomIcons
+Vintagestory.API.Client.IconUtil :: METHOD public Void DrawIcon(Context cr, String type, Double x, Double y, Double width, Double height, Double[] rgba)  [decl:IconUtil]
+Vintagestory.API.Client.IconUtil :: METHOD public Void DrawIconInt(Context cr, String type, Int32 x, Int32 y, Single width, Single height, Double[] rgba)  [decl:IconUtil]
+Vintagestory.API.Client.IconUtil :: METHOD public Void DrawLeftMouseButton(Context cr, Int32 x, Int32 y, Single width, Single height, Double[] rgba)  [decl:IconUtil]
+Vintagestory.API.Client.IconUtil :: METHOD public Void DrawRightMouseButton(Context cr, Int32 x, Int32 y, Single width, Single height, Double[] rgba)  [decl:IconUtil]
+Vintagestory.API.Client.KeyCombination :: FIELD  public Boolean Alt
+Vintagestory.API.Client.KeyCombination :: FIELD  public Boolean Ctrl
+Vintagestory.API.Client.KeyCombination :: FIELD  public Boolean Shift
+Vintagestory.API.Client.KeyCombination :: FIELD  public Int32 KeyCode
+Vintagestory.API.Client.KeyCombination :: FIELD  public Nullable<Int32> SecondKeyCode
+Vintagestory.API.Client.KeyCombination :: FIELD  public static Int32 MouseStart
+Vintagestory.API.Client.KeyCombination :: METHOD public Boolean IsMouseButton(Int32 KeyCode)  [decl:KeyCombination]
+Vintagestory.API.Client.KeyCombination :: METHOD public String PrimaryAsString()  [decl:KeyCombination]
+Vintagestory.API.Client.KeyCombination :: METHOD public String SecondaryAsString()  [decl:KeyCombination]
+Vintagestory.API.Client.KeyCombination :: METHOD public virtual String ToString()  [decl:KeyCombination]
+Vintagestory.API.Client.TextDrawUtil :: METHOD public Void DrawTextLine(Context ctx, CairoFont font, String text, Double offsetX = 0, Double offsetY = 0, Boolean textPathMode = False)  [decl:TextDrawUtil]
+Vintagestory.API.Client.WorldInteraction :: FIELD  public EnumMouseButton MouseButton
+Vintagestory.API.Client.WorldInteraction :: FIELD  public String ActionLangCode
+Vintagestory.API.Client.WorldInteraction :: FIELD  public String HotKeyCode
+Vintagestory.API.Client.WorldInteraction :: PROP   String[] HotKeyCodes { public get; public set; }
+Vintagestory.API.Config.RuntimeEnv :: FIELD  public static Single GUIScale
+Vintagestory.Client.NoObf.ClientMain :: FIELD  public GuiComposerManager GuiComposers
+Vintagestory.Client.NoObf.ClientSettings :: FIELD  public static ClientSettings Inst
+Vintagestory.Client.NoObf.ClientSettings :: METHOD public Void AddKeyCombinationUpdatedWatcher(Action<String,KeyCombination> handler)  [decl:ClientSettings]
+Vintagestory.Client.NoObf.ClientSettings :: METHOD public virtual Void ClearWatchers()  [decl:ClientSettings]
+Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: FIELD  public Double ActualWidth
+Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: FIELD  public Double UnscaledLineHeight
+Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: FIELD  public Single FontSize
+Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: METHOD public Void ComposeBlockWorldInteractionHelp(WorldInteraction[] wis)  [decl:DrawWorldInteractionUtil]
+Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: METHOD public Void drawHelp(Context ctx, ImageSurface surface, ElementBounds currentBounds, ItemStack[] stacks, Double lineheight, WorldInteraction wi)  [decl:DrawWorldInteractionUtil]
+Vintagestory.Client.NoObf.GuiComposerManager :: METHOD public Void MarkAllDialogsForRecompose()  [decl:GuiComposerManager]
+Vintagestory.Client.NoObf.GuiComposerManager :: METHOD public Void RecomposeAllDialogs()  [decl:GuiComposerManager]

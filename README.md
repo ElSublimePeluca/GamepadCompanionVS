@@ -17,7 +17,8 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 - **Acciones compuestas**: una sola slot del radial puede ejecutar varias acciones en secuencia.
 - **Inyección de teclas individuales** (`KeyPressAction`): bindeás cualquier tecla del teclado a un slot/botón del gamepad. Útil para hotkeys que no aparecen en la lista vanilla.
 - **Teclado virtual on-screen** para tipear comandos y chat con el gamepad. QWERTY + `/` `.` para `/comandos`. DPad navega, A escribe, B cierra.
-- **Editor in-game** (`/gpconfig` o tecla Insert por default): tabs para Rueda, Botones del gamepad, y Sensibilidad. Persistencia automática a JSON.
+- **Íconos del mando en las ayudas del juego**: el cartel que aparece al mirar un bloque, el hint del ítem en mano, el manual y los tooltips muestran el botón del mando en vez de la tecla o el ícono de mouse. Se elige el estilo (Xbox / PlayStation / Nintendo) o se deja en automático, que lo deduce del mando conectado. Ver [Íconos en las ayudas](#íconos-en-las-ayudas).
+- **Editor in-game** (`.gpconfig` o tecla Insert por default): tabs para Rueda, Botones del gamepad, Sensibilidad y Ayudas. Persistencia automática a JSON.
 
 ## Requisitos
 
@@ -55,7 +56,7 @@ En los layouts PS4 el mod ignora los raw buttons 6/7 (L2/R2 como botón digital)
 | Switch Pro Controller | ⚠️ Depende del modo |
 | Joysticks vintage / no-xpad / no-PS4 | ❌ Layout desconocido, mapeos van a salir mal |
 
-Si tu controller no funciona, podés diagnosticar con `/gpaxes` (dump raw de los axes). El log del cliente también imprime el layout detectado al conectar (`detected ... layout`) y la lista completa de joysticks presentes (`candidates at connect`).
+Si tu controller no funciona, podés diagnosticar con `.gpaxes` (dump raw de los axes). El log del cliente también imprime el layout detectado al conectar (`detected ... layout`) y la lista completa de joysticks presentes (`candidates at connect`).
 
 ### El personaje camina o gira solo, o el mod ignora tu control
 
@@ -65,9 +66,9 @@ programables y otros HID aparecen con la misma forma (botones + ejes). Si el mod
 esos, el resultado típico es un personaje que camina en diagonal y una cámara que gira sola,
 mientras tu control real ni figura.
 
-Corré `/gpdevice` para ver todos los joysticks presentes: el listado dice cuál está en uso y por
-qué descartó a los demás. Si el elegido no es el tuyo, `/gpdevice <número>` fuerza el correcto y
-lo guarda en el config para las próximas sesiones (`/gpdevice auto` deshace la elección).
+Corré `.gpdevice` para ver todos los joysticks presentes: el listado dice cuál está en uso y por
+qué descartó a los demás. Si el elegido no es el tuyo, `.gpdevice <número>` fuerza el correcto y
+lo guarda en el config para las próximas sesiones (`.gpdevice auto` deshace la elección).
 
 ### Steam Input
 
@@ -114,7 +115,7 @@ Si tu controller solo aparece como gamepad cuando Steam Input lo emula (típico 
 | DPad ↓    | Press G (sentarse) |
 | DPad ←/→  | Cambiar slot del hotbar (o navegar slots en cursor mode) |
 
-Todo configurable desde `/gpconfig`.
+Todo configurable desde `.gpconfig`.
 
 ### Mantener una tecla (mods con modificador)
 
@@ -136,18 +137,59 @@ Cursor** del juego, así que mientras la mantengas el mouse queda libre — la c
 derecho no gira y el HUD de slots de RKN aparece, que es exactamente lo que ese flujo necesita.
 La puntería sigue siendo el centro de la pantalla mientras no muevas el mouse físico.
 
+### Íconos en las ayudas
+
+Con un mando conectado, las ayudas que dibuja el propio juego muestran el botón del mando en vez
+de la tecla: donde decía "🖱 derecho: Abrir" pasa a decir **`[LT]: Abrir`**, y donde decía
+"Shift + 🖱 derecho: Poner en la pila" pasa a decir **`[RS*] + [LT]`**.
+
+Alcanza al cartel del bloque mirado, al hint del ítem que tenés en mano, al manual y a los
+tooltips. Quedan sin tocar a propósito **Ajustes > Controles** (ahí las teclas tienen que seguir
+siendo teclas) y los números del hotbar (con mando el D-pad *cicla* slots, así que no hay botón
+que mostrar).
+
+En el cartel la conversión es **todo o nada por línea**: si alguna parte de la línea no se puede
+traducir con honestidad, la línea entera se queda en teclado. Media línea en glifos y media en
+teclado se lee peor que ninguna.
+
+El estilo se elige en `.gpconfig` → tab **Ayudas**, o con `.gpglyphs`:
+
+| Estilo | Cara de abajo | Gatillos | Stick apretado |
+|---|---|---|---|
+| Xbox | `A` | `LT` `RT` | `LS` `RS` |
+| PlayStation | `Cross` | `L2` `R2` | `L3` `R3` |
+| Nintendo | `B` | `ZL` `ZR` | `L3` `R3` |
+
+En **automático** la familia sale del nombre del mando, y la tab muestra entre paréntesis qué
+resolvió. Hay casos que por software son indistinguibles — un GameSir Cyclone 2 en modo PS4 se
+declara con el vendor id de Sony aunque tenga serigrafía A/B/X/Y — y para eso está el override
+manual.
+
+**La marca `*`**: una etiqueta como `RS*` quiere decir que en este mod ese botón es un
+**toggle**, no una tecla que se mantiene. L3 y R3 activan y desactivan Ctrl y Shift de una
+pulsación, así que `[RS*] + [LT]: Poner en la pila` se hace apretando RS, después LT, y
+después RS otra vez para desactivarlo — no manteniendo RS. Sin la marca, el cartel estaría
+diciendo algo que no es.
+
+Si el mando está conectado pero preferís las ayudas de teclado, `.gpglyphs off`.
+
 ### Comandos chat
+
+Todos son comandos de **cliente**, así que van con **punto**, no con barra: `.gpconfig`, no
+`/gpconfig`. En Vintage Story `.` habla con el cliente y `/` con el servidor — un `/gpconfig`
+se le manda al servidor, que no lo conoce, y contesta "ese comando no existe".
 
 | Comando        | Qué hace |
 |----------------|----------|
-| `/gpconfig`    | Abre el dialog de configuración (también con tecla Insert) |
-| `/gpdumphotkeys` | Lista todas las hotkeys registradas en el log |
-| `/gpaxes`      | Dump raw de los axes del gamepad (debug) |
-| `/gpdevice`    | Lista los joysticks que ve el juego; `/gpdevice <n>` fuerza uno, `/gpdevice auto` vuelve a autodetección |
-| `/gpyaw <val>` | Set sensibilidad horizontal de cámara |
-| `/gppitch <val>` | Set sensibilidad vertical |
-| `/gpinvertpitch` | Toggle invertir pitch |
-| `/gpguis`      | Dump dialogs abiertos (debug) |
+| `.gpconfig`    | Abre el dialog de configuración (también con tecla Insert) |
+| `.gpdumphotkeys` | Lista todas las hotkeys registradas en el log |
+| `.gpaxes`      | Dump raw de los axes del gamepad (debug) |
+| `.gpdevice`    | Lista los joysticks que ve el juego; `.gpdevice <n>` fuerza uno, `.gpdevice auto` vuelve a autodetección |
+| `.gpglyphs`    | Estado completo de los íconos del mando en las ayudas: mando detectado, familia resuelta y por qué, y qué botón muestra cada tecla. `.gpglyphs <off\|auto\|xbox\|playstation\|nintendo>` lo fija |
+| `.gpyaw <val>` | Set sensibilidad horizontal de cámara |
+| `.gppitch <val>` | Set sensibilidad vertical |
+| `.gpinvertpitch` | Toggle invertir pitch |
+| `.gpguis`      | Dump dialogs abiertos (debug) |
 
 ### Archivo de config
 

@@ -3,6 +3,7 @@
     "tab-wheel": "Wheel",
     "tab-buttons": "Buttons",
     "tab-sensitivity": "Sensitivity",
+    "tab-hints": "Hints",
     "close": "Close",
     "cancel": "Cancel",
     "ok": "OK",
@@ -21,7 +22,7 @@
     "sens-pitch": "Vertical sensitivity",
     "sens-deadzone": "Dead zone (%)",
     "sens-invert-pitch": "Invert pitch",
-    "sens-swap-triggers": "Swap triggers (LT/RT)",
+    "sens-swap-triggers": "Swap LT / RT",
     "clear-binding": "Clear binding",
     "no-results": "No results",
     "composite-title": "Action combination",
@@ -47,5 +48,15 @@
     "keypress-label": "Key {0}",
     "holdkey-label": "Hold {0}",
     "key-g-sit": "G key (sit)",
-    "hotkey-open-config": "GamepadCompanion: open settings"
+    "hotkey-open-config": "GamepadCompanion: open settings",
+    "hints-style": "Gamepad icons",
+    "hints-style-title": "Gamepad icons: choose a style",
+    "hints-style-auto": "Automatic",
+    "hints-style-auto-resolved": "Automatic ({0})",
+    "hints-style-off": "Off",
+    "hints-wheel": "Wheel actions",
+    "hints-preview": "Preview",
+    "hints-preview-action": "Open",
+    "hints-no-gamepad": "No gamepad connected: hints stay on the keyboard.",
+    "hints-toggle-note": "{0} = press once to toggle, do not hold."
 }

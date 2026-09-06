@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cairo;
 using GamepadCompanion.Actions;
+using GamepadCompanion.Glyphs;
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -9,9 +11,11 @@ using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Gui;
 
-// Editor de configuración del mod. Dos tabs:
-//   - Rueda:        editor de los 8 slots del radial.
+// Editor de configuración del mod. Cuatro tabs:
+//   - Rueda:        editor de los 12 slots del radial.
+//   - Botones:      override de la acción de cada botón.
 //   - Sensibilidad: dead zone, sensibilidad de cámara, invertir pitch.
+//   - Ayudas:       familia de glifos de los hints del juego, con vista previa.
 // onChanged se invoca tras cualquier cambio (slot o sensibilidad). El
 // ModSystem lo cablea con StoreModConfig para persistir en JSON.
 public sealed class ConfigDialog : GuiDialog
@@ -38,8 +42,13 @@ public sealed class ConfigDialog : GuiDialog
     // Tab body: layout para "Sensibilidad".
     private const double SensRowH       = 32;
     private const double SensRowGap     = 10;
-    private const double SensLabelW     = 140;
-    private const double SensControlW   = 280;
+    // 185/250 y no 140/280: "Sensibilidad horizontal" (173) e "Intercambiar
+    // LT/RT" (147) no entraban en 140, y AddStaticText no recorta sino que
+    // ENVUELVE, así que la segunda línea se comía la fila de abajo. Venía así
+    // desde antes de la tab Ayudas, en los tres idiomas. El control sigue
+    // entrando: 16 + 185 + 8 + 250 = 459, contra 464 de borde útil.
+    private const double SensLabelW     = 185;
+    private const double SensControlW   = 250;
     private const double SensResetGap   = 16;
     private const double SensResetH     = 32;
 
@@ -50,13 +59,28 @@ public sealed class ConfigDialog : GuiDialog
     private const double BtnLabelW      = 100;
     private const double BtnPickerW     = 260;
 
+    // Tab body: layout para "Ayudas". La columna de etiqueta es ancha a
+    // propósito: AddStaticText no recorta, ENVUELVE, y una etiqueta que no entra
+    // se come la fila de abajo. Los anchos salen medidos en los tres idiomas con
+    // `dotnet run --project tools/gpclab -- labels`; si tocás un texto de esta
+    // tab, volvé a correrlo.
+    private const double HintRowH     = 30;
+    private const double HintRowGap   = 10;
+    private const double HintLabelW   = 210;
+    private const double HintControlW = 230;
+    private const double HintPreviewH = 46;
+
     private const int TabWheel = 0;
     private const int TabSensitivity = 1;
     private const int TabButtons = 2;
+    private const int TabHints = 3;
 
     private readonly SlotBindings bindings;
     private readonly ButtonBindings buttonBindings;
     private readonly GamepadCompanionConfig config;
+    // Puede ser null: si el subsistema de glifos no arrancó, el resto del
+    // diálogo tiene que seguir funcionando igual.
+    private readonly GlyphSession? glyphs;
     private readonly Action? onChanged;
 
     private int currentTab = TabWheel;
@@ -88,16 +112,20 @@ public sealed class ConfigDialog : GuiDialog
 
     public override string ToggleKeyCombinationCode => null!;
 
-    public ConfigDialog(
+    // internal y no public: recibe la GlyphSession, que es interna. El diálogo
+    // sólo lo construye el ModSystem.
+    internal ConfigDialog(
         ICoreClientAPI capi,
         SlotBindings bindings,
         ButtonBindings buttonBindings,
         GamepadCompanionConfig config,
+        GlyphSession? glyphs = null,
         Action? onChanged = null) : base(capi)
     {
         this.bindings = bindings;
         this.buttonBindings = buttonBindings;
         this.config = config;
+        this.glyphs = glyphs;
         this.onChanged = onChanged;
         BuildEntryList();
         Compose();
@@ -185,6 +213,9 @@ public sealed class ConfigDialog : GuiDialog
             new GuiTab { Name = Lang.Get("gamepadcompanion:tab-sensitivity"),
                          DataInt = TabSensitivity,
                          Active = currentTab == TabSensitivity },
+            new GuiTab { Name = Lang.Get("gamepadcompanion:tab-hints"),
+                         DataInt = TabHints,
+                         Active = currentTab == TabHints },
         };
 
         var compo = capi.Gui
@@ -203,6 +234,7 @@ public sealed class ConfigDialog : GuiDialog
             case TabWheel:       ComposeWheelTab(compo, bodyY); break;
             case TabButtons:     ComposeButtonsTab(compo, bodyY); break;
             case TabSensitivity: ComposeSensitivityTab(compo, bodyY); break;
+            case TabHints:       ComposeHintsTab(compo, bodyY); break;
         }
 
         var closeBounds = ElementBounds.Fixed(
@@ -226,6 +258,12 @@ public sealed class ConfigDialog : GuiDialog
         // constantes (Sensibilidad=1, Botones=2), así que asignar currentTab
         // directo resaltaba la tab equivocada: elegir Sensibilidad mostraba
         // el contenido correcto pero dejaba iluminada Botones. Issue #1.
+        // El switch de la tab Ayudas necesita SetValue post-compose, igual que los
+        // de Sensibilidad. Va acá adentro y no en OnGuiOpened porque a esta tab
+        // se la recompone también al elegir un estilo en el picker, y ahí el
+        // switch volvería a arrancar apagado.
+        ApplyHintsWidgetState();
+
         int activeIdx = Array.FindIndex(tabs, t => t.DataInt == currentTab);
         SingleComposer.GetHorizontalTabs("tabs").activeElement =
             activeIdx < 0 ? 0 : activeIdx;
@@ -399,6 +437,165 @@ public sealed class ConfigDialog : GuiDialog
         return baseIdx == 0 ? 0 : baseIdx + MetaEntryCount;
     }
 
+    // Tab "Ayudas": qué familia de íconos se muestra en los hints del propio
+    // juego (el cartel del bloque mirado, el hint del ítem en mano, el manual).
+    private void ComposeHintsTab(GuiComposer compo, double startY)
+    {
+        double y = startY;
+
+        // Fila 1: estilo.
+        compo.AddStaticText(Lang.Get("gamepadcompanion:hints-style"),
+                            CairoFont.WhiteSmallText(),
+                            ElementBounds.Fixed(Margin, y + 6, HintLabelW, HintRowH));
+        compo.AddSmallButton(GuiTextFit.EllipsizeButton(StyleButtonLabel(), HintControlW),
+                             () => { OpenStylePicker(); return true; },
+                             ElementBounds.Fixed(Margin + HintLabelW + 8, y, HintControlW, HintRowH),
+                             EnumButtonStyle.Normal);
+        y += HintRowH + HintRowGap;
+
+        // Fila 2: si las acciones de la rueda también muestran glifo.
+        compo.AddStaticText(Lang.Get("gamepadcompanion:hints-wheel"),
+                            CairoFont.WhiteSmallText(),
+                            ElementBounds.Fixed(Margin, y + 6, HintLabelW, HintRowH));
+        compo.AddSwitch(v =>
+            {
+                config.GlyphWheel = v;
+                onChanged?.Invoke();
+                glyphs?.Resolver.Invalidate();
+            },
+            ElementBounds.Fixed(Margin + HintLabelW + 8, y, 30, 30), "hintswheel");
+        y += HintRowH + HintRowGap;
+
+        // Fila 3: vista previa. Es la inversión que más rinde de toda la tab:
+        // sin ella, cada iteración sobre el dibujo cuesta reiniciar el juego,
+        // encontrar un cofre y mirarlo, en la única máquina que corre el juego.
+        compo.AddStaticText(Lang.Get("gamepadcompanion:hints-preview"),
+                            CairoFont.WhiteSmallText(),
+                            ElementBounds.Fixed(Margin, y, HintLabelW, HintRowH));
+        y += 26;
+        compo.AddStaticCustomDraw(
+            ElementBounds.Fixed(Margin, y, DialogW - 2 * Margin, HintPreviewH),
+            (ctx, _, bounds) => DrawHintPreview(ctx, bounds));
+        y += HintPreviewH + HintRowGap;
+
+        // Fila 4: estado. Que no haya mando conectado es justo el momento más
+        // común en que alguien abre esta pantalla, así que se dice.
+        var status = new List<string>();
+        if (glyphs is null)
+            status.Add("Glyph hints failed to start — see the client log.");
+        else if (!glyphs.Provider.IsConnected)
+            status.Add(Lang.Get("gamepadcompanion:hints-no-gamepad"));
+        status.Add(Lang.Get("gamepadcompanion:hints-toggle-note", GlyphLabels.ToggleMark));
+
+        foreach (string line in status)
+        {
+            compo.AddStaticText(line, CairoFont.WhiteDetailText(),
+                                ElementBounds.Fixed(Margin, y, DialogW - 2 * Margin, 22));
+            y += 20;
+        }
+    }
+
+    // Con `auto` se muestra entre paréntesis lo que resolvió: la mitad de los
+    // reportes posibles sobre glifos son "me muestra los botones equivocados", y
+    // verlo acá los contesta antes de que existan.
+    private string StyleButtonLabel()
+    {
+        GlyphStyle configured = GlyphStyles.Parse(config.GlyphStyle);
+        return configured switch
+        {
+            GlyphStyle.Off => Lang.Get("gamepadcompanion:hints-style-off"),
+            GlyphStyle.Auto when glyphs is { Resolver.Active: true } g
+                => Lang.Get("gamepadcompanion:hints-style-auto-resolved", g.Resolver.Style.ToString()),
+            GlyphStyle.Auto => Lang.Get("gamepadcompanion:hints-style-auto"),
+            _ => configured.ToString(),
+        };
+    }
+
+    // El índice 0 del picker es a la vez la primera entrada y lo que devuelve su
+    // botón de limpiar, así que ahí va "Automático", que es el default.
+    private static readonly GlyphStyle[] StyleOrder =
+        { GlyphStyle.Auto, GlyphStyle.Xbox, GlyphStyle.PlayStation, GlyphStyle.Nintendo, GlyphStyle.Off };
+
+    private void OpenStylePicker()
+    {
+        string[] names = StyleOrder.Select(st => st switch
+        {
+            GlyphStyle.Off  => Lang.Get("gamepadcompanion:hints-style-off"),
+            GlyphStyle.Auto => StyleButtonLabel(),
+            _               => st.ToString(),
+        }).ToArray();
+
+        GlyphStyle current = GlyphStyles.Parse(config.GlyphStyle);
+        int currentIdx = Math.Max(0, Array.IndexOf(StyleOrder, current));
+
+        new HotKeyPickerDialog(
+            capi,
+            Lang.Get("gamepadcompanion:hints-style-title"),
+            names,
+            currentIdx,
+            idx =>
+            {
+                config.GlyphStyle = GlyphStyles.Serialize(
+                    StyleOrder[(uint)idx < StyleOrder.Length ? idx : 0]);
+                onChanged?.Invoke();
+                glyphs?.Resolver.Invalidate();
+                Compose();
+            },
+            clearButtonLabel: Lang.Get("gamepadcompanion:hints-style-auto")).TryOpen();
+    }
+
+    // Una línea de cartel de verdad: misma fuente, mismo contorno, mismo avance
+    // fijo del ícono, y el ícono sale por capi.Gui.Icons.DrawIcon, o sea por el
+    // MISMO delegate que dibuja en el juego. No es una maqueta parecida — si el
+    // painter decide rendirse y dejar el mouse de vanilla, acá se ve eso.
+    private void DrawHintPreview(Context ctx, ElementBounds bounds)
+    {
+        // El Save va FUERA del try y el Restore en el finally: el contexto es
+        // compartido con el resto del diálogo, y si algo tira después del
+        // Translate el resto de la composición se dibujaría corrido.
+        ctx.Save();
+        try
+        {
+            double[] color = (double[])GuiStyle.DialogDefaultTextColor.Clone();
+            for (int i = 0; i < 3; i++) color[i] = (color[i] + 1.0) / 2.0;
+            CairoFont font = CairoFont.WhiteMediumText().WithColor(color).WithFontSize(20f)
+                                      .WithStroke(GuiStyle.DarkBrownColor, 2.0);
+
+            // Se dibuja desde x = 0 y se traslada: HotkeyComponent.DrawHotkey
+            // mete un "+" de separación cuando recibe x > 0, y la primera
+            // cápsula de la línea no lleva ninguno.
+            ctx.Translate(bounds.drawX, bounds.drawY);
+            font.SetupContext(ctx);
+
+            double lh = GuiElement.scaled(30.0);
+            double textH = font.GetFontExtents().Height;
+            double plusW = font.GetTextExtents("+").Width;
+            double x = 0.0;
+
+            string? modifier = capi.Input.GetHotKeyByCode("shift")?.CurrentMapping?.PrimaryAsString();
+            if (!string.IsNullOrEmpty(modifier))
+                x = HotkeyComponent.DrawHotkey(capi, modifier, x, 0.0, ctx, font,
+                                               lh, textH, plusW, 5.0, 10.0, color);
+
+            capi.Gui.Icons.DrawIcon(ctx, "rightmousebutton", x, 1.0, lh, lh, color);
+            x += lh + 5.0 + 1.0;          // el avance fijo del llamador real
+
+            capi.Gui.Text.DrawTextLine(ctx, font,
+                ": " + Lang.Get("gamepadcompanion:hints-preview-action"),
+                x - 4.0, (lh - textH) / 2.0 + 2.0);
+        }
+        catch (Exception e)
+        {
+            // Que la vista previa falle no puede llevarse el diálogo de config.
+            capi.Logger.Warning("GamepadCompanion: hint preview failed to draw.");
+            capi.Logger.Warning(e);
+        }
+        finally
+        {
+            ctx.Restore();
+        }
+    }
+
     private void ComposeSensitivityTab(GuiComposer compo, double startY)
     {
         double y = startY;
@@ -501,6 +698,12 @@ public sealed class ConfigDialog : GuiDialog
         base.OnGuiOpened();
         // Switch y sliders requieren SetValue/SetValues post-compose.
         ApplySensitivityWidgetState();
+    }
+
+    private void ApplyHintsWidgetState()
+    {
+        if (currentTab != TabHints) return;
+        SingleComposer.GetSwitch("hintswheel").SetValue(config.GlyphWheel);
     }
 
     private void ApplySensitivityWidgetState()

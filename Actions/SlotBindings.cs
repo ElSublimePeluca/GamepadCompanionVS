@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
@@ -73,46 +72,15 @@ public sealed class SlotBindings
         return new SlotBindings(actions);
     }
 
+    // El switch de serialización vive en SlotConfigActions, compartido con
+    // ButtonBindings: cuando había una copia acá se quedó sin la rama de
+    // HoldKeyAction y un "mantener tecla" asignado a un slot se perdía al
+    // guardar (el picker de la rueda sí lo ofrece, Gui/ConfigDialog.cs).
     public SlotConfig?[] ToConfig()
     {
         var arr = new SlotConfig?[SlotCount];
         for (int i = 0; i < SlotCount; i++)
-            arr[i] = ActionToConfig(slots[i]);
+            arr[i] = SlotConfigActions.ToConfig(slots[i]);
         return arr;
     }
-
-    private static SlotConfig? ActionToConfig(IGameAction? action) =>
-        action switch
-        {
-            HotKeyAction hk
-                => new SlotConfig { Type = "hotkey",
-                                    Code = hk.Code, Label = hk.Label },
-            OpenLoadedGuiAction og
-                => new SlotConfig { Type = "openDialog",
-                                    DialogType = og.DialogTypeName,
-                                    Label = og.Label },
-            BuiltinAction bi
-                => new SlotConfig { Type = "builtin",
-                                    Code = bi.Code, Label = bi.Label },
-            KeyPressAction kp
-                => new SlotConfig
-                   {
-                       Type = "keypress",
-                       KeyCode = kp.KeyCode,
-                       CtrlPressed = kp.CtrlPressed,
-                       ShiftPressed = kp.ShiftPressed,
-                       AltPressed = kp.AltPressed,
-                       Label = kp.Label,
-                   },
-            CompositeAction co
-                => new SlotConfig
-                   {
-                       Type = "composite",
-                       Label = co.Label,
-                       Children = co.Children
-                           .Select(c => ActionToConfig(c))
-                           .ToArray(),
-                   },
-            _   => null,
-        };
 }

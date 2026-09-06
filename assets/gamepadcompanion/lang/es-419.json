@@ -3,6 +3,7 @@
     "tab-wheel": "Rueda",
     "tab-buttons": "Botones",
     "tab-sensitivity": "Sensibilidad",
+    "tab-hints": "Ayudas",
     "close": "Cerrar",
     "cancel": "Cancelar",
     "ok": "Aceptar",
@@ -21,7 +22,7 @@
     "sens-pitch": "Sensibilidad vertical",
     "sens-deadzone": "Dead zone (%)",
     "sens-invert-pitch": "Invertir pitch",
-    "sens-swap-triggers": "Intercambiar triggers (LT/RT)",
+    "sens-swap-triggers": "Intercambiar LT/RT",
     "clear-binding": "Quitar binding",
     "no-results": "Sin resultados",
     "composite-title": "Combinación de acciones",
@@ -47,5 +48,15 @@
     "keypress-label": "Tecla {0}",
     "holdkey-label": "Mantener {0}",
     "key-g-sit": "Tecla G (sentarse)",
-    "hotkey-open-config": "GamepadCompanion: abrir configuración"
+    "hotkey-open-config": "GamepadCompanion: abrir configuración",
+    "hints-style": "Íconos del control",
+    "hints-style-title": "Íconos del control: elegí un estilo",
+    "hints-style-auto": "Automático",
+    "hints-style-auto-resolved": "Automático ({0})",
+    "hints-style-off": "Desactivado",
+    "hints-wheel": "Acciones de la rueda",
+    "hints-preview": "Vista previa",
+    "hints-preview-action": "Abrir",
+    "hints-no-gamepad": "Sin control conectado: las ayudas muestran el teclado.",
+    "hints-toggle-note": "{0} = se aprieta una vez, no se mantiene."
 }

@@ -164,6 +164,15 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
 
     public bool IsConnected => joystickId.HasValue;
     public string? DeviceName { get; private set; }
+
+    // Se calcula al SELECCIONAR el device y no dentro de DetectLayout, aunque
+    // ahí ya se computaba uno: DetectLayout tiene cinco early-returns por
+    // nombre antes de mirar el GUID, así que para cinco de los siete caminos de
+    // detección — incluido el GameSir Cyclone 2 por USB — el vendor nunca se
+    // llegaba a computar. Y DetectLayout es sticky, o sea que no hay segunda
+    // oportunidad. Acá pasa por AcceptGamepad, que es el único embudo por el
+    // que entra un device, sea por autodetección o por .gpdevice.
+    public int VendorId { get; private set; }
     public string? PreferredDeviceName { get; set; }
 
     public GlfwGamepadProvider(ILogger logger)
@@ -253,6 +262,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
     {
         joystickId = jid;
         DeviceName = name;
+        VendorId = VendorIdFromGuid(GLFW.GetJoystickGUID(jid) ?? string.Empty);
         manualSelection = manual;
         pollsSinceConnect = 0;
         pinnedPollsSinceConnect = 0;
@@ -679,6 +689,7 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
             logger.Notification($"GamepadCompanion: gamepad jid={jid} released ({reason})");
         joystickId = null;
         DeviceName = null;
+        VendorId = 0;
         pollsWithoutGamepad = 0;
         ltRangeSigned = false;
         rtRangeSigned = false;

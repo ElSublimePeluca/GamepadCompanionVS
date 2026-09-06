@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AssemblyName>gpclab</AssemblyName>
+    <RootNamespace>GamepadCompanion.Lab</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- Misma resolucion que GamepadCompanion.csproj: variable de entorno primero, rutas
+       por defecto de cada plataforma despues. -->
+  <PropertyGroup>
+    <VINTAGE_STORY Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')">$(AppData)/Vintagestory</VINTAGE_STORY>
+    <VINTAGE_STORY Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')">$(HOME)/.local/share/vintagestory</VINTAGE_STORY>
+  </PropertyGroup>
+
+  <Target Name="VerifyVintageStoryPath" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')"
+           Text="gpclab needs an extracted Vintage Story install (it does not need to be playable). Set VINTAGE_STORY to the directory containing VintagestoryAPI.dll. Tried: '$(VINTAGE_STORY)'." />
+  </Target>
+
+  <!-- Private=false a proposito: los DLL del juego NO se copian al output y se cargan en
+       runtime desde VINTAGE_STORY (ver el AssemblyResolve de Program.cs). Con una copia en
+       bin/, apicheck podria pasar contra los DLL viejos justo el dia que el juego se
+       actualizo, que es el unico dia en que apicheck importa. -->
+  <!-- selftest corre codigo del mod: pruebas de regresion offline de dos caminos que solo
+       se ejercitan con el juego abierto (round-trip de bindings, recuperacion de config
+       corrupta). El mod no referencia a tools/, asi que no hay ciclo. -->
+  <ItemGroup>
+    <ProjectReference Include="../../GamepadCompanion.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="VintagestoryAPI">
+      <HintPath>$(VINTAGE_STORY)/VintagestoryAPI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="VintagestoryLib">
+      <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="cairo-sharp">
+      <HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

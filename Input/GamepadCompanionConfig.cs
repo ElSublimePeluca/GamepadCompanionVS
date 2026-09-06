@@ -36,6 +36,22 @@ public sealed class GamepadCompanionConfig
     // discriminador para evitar custom JsonConverter.
     public SlotConfig?[]? RadialSlots { get; set; } = null;
 
+    // Familia de glifos para los hints del juego: "off" | "auto" | "xbox" |
+    // "playstation" | "nintendo". Es un STRING y no un enum a propósito:
+    // LoadModConfig deserializa sin tolerancia y un enum con un valor
+    // desconocido tira dentro de StartClientSide. El parseo vive en
+    // Glyphs/GlyphStyle.cs y cae en "auto" ante cualquier cosa rara.
+    public string GlyphStyle { get; set; } = "auto";
+
+    // Si las acciones asignadas a la rueda radial también muestran glifo. Se
+    // muestra "LB" a secas (mantené LB, está en la rueda): el índice del slot
+    // no lo ve el jugador, así que "LB+3" no sería accionable.
+    public bool GlyphWheel { get; set; } = true;
+
+    // Canales de glifos apagados a mano, separados por coma: "icons,sign".
+    // Escotilla de emergencia para un reporte, sin tener que tocar código.
+    public string? GlyphChannelsOff { get; set; } = null;
+
     // Override de la acción edge-press de un botón. Key = nombre del
     // GamepadButton (A, B, DPadLeft, etc.). Una entry presente reemplaza
     // el default hardcoded de ButtonMapper para ese botón. null/ausente

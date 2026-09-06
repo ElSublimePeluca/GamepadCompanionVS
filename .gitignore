@@ -12,3 +12,6 @@ PLAN.md
 
 # Release artifacts (uploaded to GitHub Releases, not tracked)
 *.zip
+
+# Material de la exploracion del issue #8 (glifos de gamepad) — interno, no va al release
+notes-issue8/

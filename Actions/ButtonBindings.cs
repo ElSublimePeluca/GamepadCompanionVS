@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 
@@ -72,54 +71,12 @@ public sealed class ButtonBindings
         var dict = new Dictionary<string, SlotConfig?>();
         foreach (var (btn, action) in map)
         {
-            var cfg = ActionToSlotConfig(action);
+            // Serializador compartido con SlotBindings (ver SlotConfigActions):
+            // tener una copia por dueño de bindings ya costó el bug de los
+            // "mantener tecla" que se borraban al guardar la rueda.
+            var cfg = SlotConfigActions.ToConfig(action);
             if (cfg is not null) dict[btn.ToString()] = cfg;
         }
         return dict;
     }
-
-    private static SlotConfig? ActionToSlotConfig(IGameAction? action) =>
-        action switch
-        {
-            HotKeyAction hk
-                => new SlotConfig { Type = "hotkey",
-                                    Code = hk.Code, Label = hk.Label },
-            OpenLoadedGuiAction og
-                => new SlotConfig { Type = "openDialog",
-                                    DialogType = og.DialogTypeName,
-                                    Label = og.Label },
-            BuiltinAction bi
-                => new SlotConfig { Type = "builtin",
-                                    Code = bi.Code, Label = bi.Label },
-            KeyPressAction kp
-                => new SlotConfig
-                   {
-                       Type = "keypress",
-                       KeyCode = kp.KeyCode,
-                       CtrlPressed = kp.CtrlPressed,
-                       ShiftPressed = kp.ShiftPressed,
-                       AltPressed = kp.AltPressed,
-                       Label = kp.Label,
-                   },
-            HoldKeyAction hd
-                => new SlotConfig
-                   {
-                       Type = "holdkey",
-                       KeyCode = hd.KeyCode,
-                       CtrlPressed = hd.CtrlPressed,
-                       ShiftPressed = hd.ShiftPressed,
-                       AltPressed = hd.AltPressed,
-                       Label = hd.Label,
-                   },
-            CompositeAction co
-                => new SlotConfig
-                   {
-                       Type = "composite",
-                       Label = co.Label,
-                       Children = co.Children
-                           .Select(c => ActionToSlotConfig(c))
-                           .ToArray(),
-                   },
-            _   => null,
-        };
 }

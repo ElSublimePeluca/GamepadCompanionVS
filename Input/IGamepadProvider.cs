@@ -15,6 +15,12 @@ public interface IGamepadProvider : IDisposable
     bool IsConnected { get; }
     string? DeviceName { get; }
 
+    // Vendor USB del device activo (0x054C = Sony, etc.), o 0 si no hay ninguno
+    // o el GUID no se pudo leer. Lo usa el resolver de glifos para desempatar
+    // nombres genéricos: "Wireless Controller" es el nombre que reporta un
+    // DualShock 4 por Bluetooth y no dice nada de la marca.
+    int VendorId { get; }
+
     // Substring (case-insensitive) del nombre del device que el usuario fijó
     // a mano. null = autodetección. Se persiste en el config del mod.
     string? PreferredDeviceName { get; set; }

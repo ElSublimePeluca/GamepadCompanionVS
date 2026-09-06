@@ -17,6 +17,29 @@
     <VINTAGE_STORY Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')">$(HOME)/.local/share/vintagestory</VINTAGE_STORY>
   </PropertyGroup>
 
+  <!-- Carpetas del arbol que NO son codigo del mod. El globbing por default de los
+       proyectos SDK-style compila todos los **/*.cs, asi que un .cs decompilado o una
+       herramienta suelta al lado del mod entra al DLL y rompe el build (paso literal:
+       notes-issue8/decomp-parcial/ModLoader.cs). Se excluyen por nombre y no con un
+       comodin para que agregar una carpeta nueva sea una decision explicita.
+         tools/        herramientas offline (gpclab), con su propio csproj
+         notes-issue8/ material de trabajo del issue #8, gitignoreado -->
+  <ItemGroup>
+    <Compile Remove="tools/**" />
+    <Compile Remove="notes-issue8/**" />
+    <None Remove="tools/**" />
+    <None Remove="notes-issue8/**" />
+  </ItemGroup>
+
+  <!-- tools/gpclab corre las pruebas de regresion offline y necesita ver los tipos
+       internos (el resolver de glifos, sobre todo). Es la unica razon; no se abre
+       nada para consumo externo. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>gpclab</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <Target Name="VerifyVintageStoryPath" BeforeTargets="BeforeBuild">
     <Error Condition="!Exists('$(VINTAGE_STORY)/VintagestoryAPI.dll')"
            Text="Could not find a Vintage Story installation. Set the VINTAGE_STORY environment variable to the game directory (the one containing VintagestoryAPI.dll). Tried: '$(VINTAGE_STORY)'." />
@@ -45,6 +68,15 @@
     </Reference>
     <Reference Include="OpenTK.Windowing.GraphicsLibraryFramework">
       <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.GraphicsLibraryFramework.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- Harmony lo trae el juego. Private=false: NO se copia al output ni entra al
+         deps.json, asi que el zip del release no cambia y no hay riesgo de cargar
+         un segundo 0Harmony. El AssemblyResolver del juego resuelve por nombre
+         simple ignorando la version, asi que compilar contra la que haya hoy
+         sigue funcionando si VS actualiza Harmony. -->
+    <Reference Include="0Harmony">
+      <HintPath>$(VINTAGE_STORY)/Lib/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="cairo-sharp">

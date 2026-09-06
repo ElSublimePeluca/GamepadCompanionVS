@@ -25,8 +25,31 @@ public sealed class ButtonMapper
     // Propiedad para que el label se resuelva vía Lang en runtime, no en
     // static init (que corre antes de que el Lang del mod esté cargado).
     private static KeyPressAction SitDefault =>
-        new((int)Vintagestory.API.Client.GlKeys.G,
+        new(SitDefaultKeyCode,
             label: Vintagestory.API.Config.Lang.Get("gamepadcompanion:key-g-sit"));
+
+    // La tecla que aprieta ese default, como constante. El resolver de glifos la
+    // necesita para saber qué muestra D-Down, y construir la KeyPressAction sólo
+    // para leerle el KeyCode llamaría a Lang.Get en medio de la recomposición de
+    // una GUI.
+    internal const int SitDefaultKeyCode = (int)GlKeys.G;
+
+    // Fuente ÚNICA del código de hotkey por botón: la leen Apply (para
+    // dispararla) y el resolver de glifos (para saber qué mostrar). Si mañana X
+    // deja de ser toolmodeselect, el hint se entera solo.
+    //
+    // Los botones sin código de hotkey NO están acá a propósito: A dispara jump
+    // desde MovementMapper, B es contextual (cerrar diálogo o tirar ítem), D-Pad
+    // ←/→ ciclan slots del hotbar sin pasar por ninguna hotkey y D-Pad ↓ aprieta
+    // una tecla suelta (ver SitDefaultKeyCode).
+    internal static string? DefaultHotkeyCode(GamepadButton button) => button switch
+    {
+        GamepadButton.X     => "toolmodeselect",
+        GamepadButton.Y     => "inventorydialog",
+        GamepadButton.Back  => "worldmapdialog",
+        GamepadButton.Start => "escapemenudialog",
+        _                   => null,
+    };
 
     private readonly ICoreClientAPI capi;
     private readonly HotkeyDispatcher hotkeys;
@@ -61,13 +84,13 @@ public sealed class ButtonMapper
         if (current.WasPressed(GamepadButton.B,         previous))
             ExecuteOrDefault(GamepadButton.B,         DefaultB);
         if (current.WasPressed(GamepadButton.X,         previous))
-            ExecuteOrDefault(GamepadButton.X,         () => hotkeys.Trigger("toolmodeselect"));
+            ExecuteOrDefault(GamepadButton.X,         () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.X)!));
         if (current.WasPressed(GamepadButton.Y,         previous))
-            ExecuteOrDefault(GamepadButton.Y,         () => hotkeys.Trigger("inventorydialog"));
+            ExecuteOrDefault(GamepadButton.Y,         () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.Y)!));
         if (current.WasPressed(GamepadButton.Back,      previous))
-            ExecuteOrDefault(GamepadButton.Back,      () => hotkeys.Trigger("worldmapdialog"));
+            ExecuteOrDefault(GamepadButton.Back,      () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.Back)!));
         if (current.WasPressed(GamepadButton.Start,     previous))
-            ExecuteOrDefault(GamepadButton.Start,     () => hotkeys.Trigger("escapemenudialog"));
+            ExecuteOrDefault(GamepadButton.Start,     () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.Start)!));
         // DPad defaults se gatean en cursor.Visible: con el cursor virtual
         // activo (dialog modal abierto), DPad navega UI en GamepadInputDriver
         // (step del cursor, zoom del worldmap, etc) — no debe disparar el
