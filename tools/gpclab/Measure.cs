@@ -171,6 +171,7 @@ internal static class Measure
         const double hintLabelW = 210;             // ConfigDialog.HintLabelW
         const double hintControlW = 230;           // ConfigDialog.HintControlW
         const double sensLabelW = 185;             // ConfigDialog.SensLabelW
+        const double overlayW = 124;               // ToggleHudOverlay.OverlayW
         var tabKeys = new[] { "tab-wheel", "tab-buttons", "tab-sensitivity", "tab-hints" };
         var buttonKeys = new[] { "hints-style-off", "hints-style-auto", "hints-style-auto-resolved" };
         // Cada texto contra LA CAJA QUE LE TOCA y con la fuente que el código le
@@ -190,6 +191,11 @@ internal static class Measure
             ("sens-yaw", false, sensLabelW),
             ("sens-pitch", false, sensLabelW),
             ("sens-deadzone", false, sensLabelW),
+            // El indicador de toggles: se dibuja alineado a la derecha en una caja
+            // de 110, y cuando está suspendido le agrega paréntesis.
+            ("hud-sprint", false, overlayW),
+            ("hud-sneak", false, overlayW),
+            ("hud-precision", false, overlayW),
         };
 
         Console.WriteLine("\n  textos del diálogo de config, por idioma");
@@ -229,6 +235,9 @@ internal static class Measure
                 {
                     CairoFont textFont = detail ? CairoFont.WhiteDetailText() : CairoFont.WhiteSmallText();
                     string text = Text(lang, key).Replace("{0}", "*");
+                    // Los del HUD se miden con los paréntesis del estado suspendido,
+                    // que es cuando son más largos.
+                    if (key.StartsWith("hud-", StringComparison.Ordinal)) text = "(" + text + ")";
                     double w = Unscaled(textFont, text);
                     Console.WriteLine($"        texto  {Trim(text, 32),-32} {w,5:0}/{box,3:0}  " +
                                       (w <= box ? "ok" : "SE ENVUELVE A 2 LÍNEAS"));

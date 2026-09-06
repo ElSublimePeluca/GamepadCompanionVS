@@ -35,6 +35,8 @@
     "vkb-backspace": "Borrar",
     "vkb-enter": "Enter",
     "vkb-close": "Cerrar",
+    "hud-sprint": "CORRER",
+    "hud-sneak": "AGACHARSE",
     "hud-precision": "PRECISIÓN",
     "builtin-dropitem": "Soltar item activo",
     "builtin-dropordismiss": "Cerrar dialog / Soltar item",

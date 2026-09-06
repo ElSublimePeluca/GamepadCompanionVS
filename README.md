@@ -12,7 +12,7 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 - **Acciones contextuales**: B cierra el dialog abierto o suelta el item activo según contexto; A salta (siempre); X/Y/Back/Start mapeados a tool mode, inventario, mapa, menú.
 - **Rueda radial** de 12 slots configurables (LB + stick derecho). Defaults para Personaje, Chat, Manual, Configurar, Teclado virtual; el resto se asigna desde el dialog.
 - **Cursor virtual sobre GUIs**: cuando hay un dialog modal abierto aparece un cursor amarillo. Con RB el stick lo mueve continuo; sin RB el DPad lo salta por pasos del tamaño de un slot — pensado para navegar inventarios rápido. RT/LT clickean (izquierdo/derecho).
-- **Toggles de Ctrl y Shift** con L3/R3, indicador en HUD esquina superior derecha (si el minimapa está pinneado ahí, el indicador se acomoda justo debajo). Sirven para shift+click en inventario, ctrl+click colocar, etc.
+- **Toggles de agacharse y correr** con L3/R3, indicador en HUD esquina superior derecha (si el minimapa está pinneado ahí, el indicador se acomoda justo debajo). Son las teclas Shift y Ctrl del juego, así que además de agacharse y correr sirven de modificador para los clicks: shift+click en inventario, ctrl+click para colocar, etc.
 - **Modo precisión** con DPad ↑: divide la sensibilidad de cámara por una fracción (default 0.3x) para apuntar bloques específicos.
 - **Acciones compuestas**: una sola slot del radial puede ejecutar varias acciones en secuencia.
 - **Inyección de teclas individuales** (`KeyPressAction`): bindeás cualquier tecla del teclado a un slot/botón del gamepad. Útil para hotkeys que no aparecen en la lista vanilla.
@@ -109,8 +109,8 @@ Si tu controller solo aparece como gamepad cuando Steam Input lo emula (típico 
 | LT        | Click derecho / interactuar / colocar |
 | Back      | Mapa |
 | Start     | Menú de pausa |
-| L3        | Toggle Ctrl |
-| R3        | Toggle Shift |
+| L3        | Toggle correr (Ctrl) |
+| R3        | Toggle agacharse (Shift) |
 | DPad ↑    | Toggle modo precisión |
 | DPad ↓    | Press G (sentarse) |
 | DPad ←/→  | Cambiar slot del hotbar (o navegar slots en cursor mode) |

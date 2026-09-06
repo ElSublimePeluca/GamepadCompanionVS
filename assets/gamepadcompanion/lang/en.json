@@ -35,6 +35,8 @@
     "vkb-backspace": "Backspace",
     "vkb-enter": "Enter",
     "vkb-close": "Close",
+    "hud-sprint": "SPRINT",
+    "hud-sneak": "SNEAK",
     "hud-precision": "PRECISION",
     "builtin-dropitem": "Drop active item",
     "builtin-dropordismiss": "Close dialog / Drop item",

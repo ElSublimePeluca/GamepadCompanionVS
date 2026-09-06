@@ -4,7 +4,7 @@ using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Toggles;
 
-// HUD overlay con indicadores ("CTRL", "SHIFT", "PRECISIÓN") en la esquina
+// HUD overlay con indicadores ("CORRER", "AGACHARSE", "PRECISIÓN") en la esquina
 // superior derecha. Color dorado cuando el toggle correspondiente está
 // activo, gris atenuado cuando inactivo, paréntesis cuando suspendido
 // (GUI abierta o focus perdido). Se reconstruye solo cuando cambia el
@@ -18,7 +18,10 @@ public sealed class ToggleHudOverlay : HudElement
     private static readonly double[] ColorInactive  = { 0.55, 0.55, 0.55, 0.85 };
     private static readonly double[] ColorSuspended = { 0.55, 0.55, 0.55, 0.55 };
 
-    private const double OverlayW  = 110;
+    // 124 y no 110: con los nombres de acción en vez de "CTRL"/"SHIFT", el peor
+    // caso pasó a ser "(AGACHARSE)" con los paréntesis del estado suspendido, que
+    // mide 102. Los textos se miden con `gpclab labels`; si tocás uno, corrélo.
+    private const double OverlayW  = 124;
     private const double RowH      = 24;
     private const double RowGap    = 2;
     private const double OverlayH  = 3 * RowH + 2 * RowGap;
@@ -106,11 +109,23 @@ public sealed class ToggleHudOverlay : HudElement
 
         SingleComposer = capi.Gui
             .CreateCompo("gpcompanion-toggles", dialogBounds)
-            .AddStaticText(LabelFor("CTRL", toggles.CtrlActive, suspended),
+            // Se nombra la ACCIÓN, no la tecla. Para quien juega con mando, "CTRL"
+            // no quiere decir nada: el botón es R3/L3 y lo que hace es correr o
+            // agacharse. Las palabras son las que usa el propio juego en Ajustes >
+            // Controles para `sprint` y `sneak`, así que coinciden con lo que el
+            // jugador ya vio ahí.
+            //
+            // Se pierde algo y conviene tenerlo presente: estos toggles son también
+            // el modificador de los clicks (agacharse = shift-click para apilar,
+            // correr = ctrl-click para colocar), y el nombre de la acción no lo
+            // sugiere. El README lo explica.
+            .AddStaticText(LabelFor(Lang.Get("gamepadcompanion:hud-sprint"),
+                                    toggles.CtrlActive, suspended),
                            FontFor(toggles.CtrlActive, suspended),
                            EnumTextOrientation.Right,
                            ctrlBounds)
-            .AddStaticText(LabelFor("SHIFT", toggles.ShiftActive, suspended),
+            .AddStaticText(LabelFor(Lang.Get("gamepadcompanion:hud-sneak"),
+                                    toggles.ShiftActive, suspended),
                            FontFor(toggles.ShiftActive, suspended),
                            EnumTextOrientation.Right,
                            shiftBounds)
