@@ -157,8 +157,11 @@ El estilo se elige en `.gpconfig` → tab **Ayudas**, o con `.gpglyphs`:
 | Estilo | Cara de abajo | Gatillos | Stick apretado |
 |---|---|---|---|
 | Xbox | `A` | `LT` `RT` | `LS` `RS` |
-| PlayStation | `Cross` | `L2` `R2` | `L3` `R3` |
+| PlayStation | ✕ (símbolo) | `L2` `R2` | `L3` `R3` |
 | Nintendo | `B` | `ZL` `ZR` | `L3` `R3` |
+
+En PlayStation las cuatro caras se dibujan con **los símbolos de verdad** (✕ ○ □ △), no
+con las palabras. El resto son etiquetas de texto porque es lo que dice el plástico.
 
 En **automático** la familia sale del nombre del mando, y la tab muestra entre paréntesis qué
 resolvió. Hay casos que por software son indistinguibles — un GameSir Cyclone 2 en modo PS4 se
@@ -226,3 +229,8 @@ Todo esto es legítimo dentro del modelo de mods de VS (la API está pública), 
 ## Licencia
 
 MIT — ver [LICENSE](LICENSE).
+
+Los cuatro símbolos de las caras de PlayStation
+(`assets/gamepadcompanion/textures/glyphs/`) salen de
+[Kenney Input Prompts](https://kenney.nl/assets/input-prompts), bajo CC0 1.0 Universal.
+Dominio público: no exige atribución, va igual porque corresponde.

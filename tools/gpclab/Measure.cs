@@ -332,6 +332,32 @@ internal static class Measure
                 MouseGlyph(ctx, "LT", ref x, y, font, lh);
                 Tail(capi, ctx, font, x, y, lh, ": Carry");
             }),
+            ("etapa 4: PlayStation con el arte de Kenney", (ctx, x, y, font, lh) =>
+            {
+                // Se dibuja con GlyphArt.DrawCapsule, el mismo método que usa el
+                // parche en el juego; sólo la carga del PNG es distinta, porque acá
+                // no hay AssetManager.
+                // El cartel abre una ventana de scope y el avance del arte depende
+                // de eso, así que el harness la abre igual que el parche.
+                var signToken = GlyphScope.Enter(sign: true);
+                ImageSurface? cross = FaceArt("ps_cross");
+                double textH = font.GetFontExtents().Height;
+                double plusW = font.GetTextExtents("+").Width;
+                if (cross is not null)
+                    x = GlyphArt.DrawCapsule(capi, ctx, "Cross", cross, x, y, font, lh,
+                                             textH, plusW, 5.0, 10.0, font.Color);
+                MouseGlyph(ctx, "L2", ref x, y, font, lh);
+                Tail(capi, ctx, font, x, y, lh, ": Abrir");
+                x = 0; y += SignLineStep();
+                Stack(ctx, ref x, y, font, lh);
+                x = Hotkey(capi, "R3", x, y, ctx, font, lh);
+                ImageSurface? triangle = FaceArt("ps_triangle");
+                if (triangle is not null)
+                    x = GlyphArt.DrawCapsule(capi, ctx, "Triangle", triangle, x, y, font, lh,
+                                             textH, plusW, 5.0, 10.0, font.Color);
+                Tail(capi, ctx, font, x, y, lh, ": Carry");
+                GlyphScope.Exit(signToken);
+            }),
             ("etapa 3: la línea entera", (ctx, x, y, font, lh) =>
             {
                 MouseGlyph(ctx, "LT", ref x, y, font, lh);
@@ -413,6 +439,25 @@ internal static class Measure
         Console.WriteLine("  filas por banda: " + string.Join(" · ", lines.Select(l => l.Label)));
         Console.WriteLine("  bandas: GUIScale 0.5 / 1.0 / 1.5 sobre cielo, y las mismas sobre cueva.");
         return 0;
+    }
+
+    // Los PNG de los glifos, leídos del repo. En el juego los carga el
+    // AssetManager; acá alcanza con abrirlos, porque lo que se está mirando es
+    // cómo quedan dibujados.
+    private static readonly Dictionary<string, ImageSurface?> faceArt = new();
+
+    private static ImageSurface? FaceArt(string name)
+    {
+        if (faceArt.TryGetValue(name, out ImageSurface? cached)) return cached;
+        ImageSurface? surface = null;
+        try
+        {
+            string? dir = FindRepoFile("assets/gamepadcompanion/textures/glyphs");
+            if (dir is not null) surface = new ImageSurface(Path.Combine(dir, name + ".png"));
+        }
+        catch (Exception e) { Console.WriteLine($"    (no pude abrir {name}.png: {e.Message})"); }
+        faceArt[name] = surface;
+        return surface;
     }
 
     private static int ZoomFactor(string[] args)

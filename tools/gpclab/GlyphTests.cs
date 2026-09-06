@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using GamepadCompanion.Actions;
@@ -34,6 +35,7 @@ internal static class GlyphTests
         DeviceSwap();
         WholeLine();
         Inactive();
+        Art();
         Patches();
         return failures;
     }
@@ -343,6 +345,49 @@ internal static class GlyphTests
             GlyphRuntime.Session = null;
             GlyphScope.ResetForFrame();
         }
+    }
+
+    // El arte de PlayStation se busca por la etiqueta que produjo el resolver
+    // ("Cross", "Circle", …). Si alguien renombra una etiqueta en GlyphLabels, el
+    // arte deja de encontrarse Y NO SE ROMPE NADA: sale el texto, silenciosamente.
+    // Este test ata las dos tablas.
+    private static void Art()
+    {
+        Console.WriteLine("\n  arte de las caras de PlayStation");
+        var (resolver, config, _) = Build();
+        config.GlyphStyle = "playstation";
+        resolver.Invalidate();
+
+        foreach (var (key, expected) in new[]
+                 {
+                     (GlKeys.Space, "Cross"),      // jump  → cara sur
+                     (GlKeys.E,     "Triangle"),   // inventario → cara norte
+                     (GlKeys.F,     "Square"),     // toolmode → cara oeste
+                 })
+        {
+            string? label = Key(resolver, key);
+            Check($"la etiqueta de {expected} sigue siendo la que busca el arte",
+                  label == expected && GlyphArt.IsFaceLabel(label), label);
+        }
+
+        Check("una etiqueta que no es cara no dispara el arte",
+              !GlyphArt.IsFaceLabel("L2") && !GlyphArt.IsFaceLabel("RS*"), "disparó");
+
+        // Y los cuatro PNG tienen que estar en el repo con el nombre que espera.
+        string? dir = FindAssets();
+        if (dir is null) { Check("los PNG del arte están en assets/", false, "no encontré la carpeta"); return; }
+        foreach (string file in new[] { "ps_cross.png", "ps_circle.png", "ps_square.png", "ps_triangle.png" })
+            Check($"existe {file}", File.Exists(Path.Combine(dir, file)), "falta");
+    }
+
+    private static string? FindAssets()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "GamepadCompanion.csproj")))
+            dir = dir.Parent;
+        if (dir is null) return null;
+        string path = Path.Combine(dir.FullName, "assets", "gamepadcompanion", "textures", "glyphs");
+        return Directory.Exists(path) ? path : null;
     }
 
     // ── andamio ───────────────────────────────────────────────────────────────

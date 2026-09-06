@@ -3,6 +3,7 @@ namespace GamepadCompanion.Glyphs;
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
+using Cairo;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 using Vintagestory.Client.NoObf;
@@ -103,6 +104,45 @@ internal static class GlyphPatches
         // Nunca vacío: el layout lineiza DisplayText y después indexa la última
         // línea sin verificar que exista.
         if (!string.IsNullOrEmpty(text)) component.DisplayText = text;
+    }
+
+    // ── P4 · el arte de las caras de PlayStation ─────────────────────────────
+    //
+    // Reemplaza el TEXTO de la cápsula por el símbolo, sin tocar la caja: el ancho
+    // lo sigue midiendo el string ("Cross"), así que el avance de retorno es
+    // idéntico al de vanilla y nada de lo que ya se reservó río arriba se entera.
+    //
+    // Ojo que esto es lo contrario de lo que se descartó para sustituir TEXTO en
+    // este mismo método: ahí el problema era que GenHotkeyTexture ya había
+    // dimensionado la superficie con el string viejo. Acá el string no cambia,
+    // sólo cambia lo que se pinta adentro.
+    internal static bool DrawHotkey_Prefix(ICoreClientAPI capi, string keycode, double x, double y,
+                                           Context ctx, CairoFont font, double lineheight,
+                                           double textHeight, double pluswdith, double symbolspacing,
+                                           double leftRightPadding, double[] color,
+                                           ref double __result)
+    {
+        // Fuera de la ventana no tocamos nada: "Cross" sólo puede venir de una
+        // sustitución nuestra, pero el gate es gratis y evita razonar sobre eso.
+        if (!GlyphScope.Open || !GlyphArt.IsFaceLabel(keycode)) return true;
+        GlyphSession? s = GlyphRuntime.Session;
+        if (s is null || !s.Art.Usable) return true;
+
+        try
+        {
+            ImageSurface? symbol = s.Artwork.Get(keycode);
+            if (symbol is null) return true;          // que dibuje vanilla el texto
+
+            __result = GlyphArt.DrawCapsule(capi, ctx, keycode, symbol, x, y, font, lineheight,
+                                            textHeight, pluswdith, symbolspacing,
+                                            leftRightPadding, color);
+            return false;
+        }
+        catch (Exception e)
+        {
+            s.Art.ReportFailure(e);
+            return true;                               // que siga vanilla con el texto
+        }
     }
 
     // ── P3 · el cartel flotante ──────────────────────────────────────────────

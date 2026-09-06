@@ -24,7 +24,7 @@ internal static class GlyphPatcher
     private static bool attempted;
     // Resultado del único intento, para poder repetirlo en las sesiones
     // siguientes sin volver a parchear.
-    private static string? rewriteFailure, vtmlFailure, signFailure, sharedNote;
+    private static string? rewriteFailure, vtmlFailure, signFailure, artFailure, sharedNote;
 
     internal static void ApplyOnce(ICoreClientAPI capi, GlyphSession session, string harmonyId)
     {
@@ -40,6 +40,12 @@ internal static class GlyphPatcher
             MethodInfo? primary = AccessTools.Method(typeof(KeyCombination), "PrimaryAsString", Type.EmptyTypes);
             MethodInfo? genTex  = AccessTools.Method(typeof(HotkeyComponent), "GenHotkeyTexture", Type.EmptyTypes);
             FieldInfo?  hotkey  = AccessTools.Field(typeof(HotkeyComponent), "hotkey");
+            MethodInfo? drawHotkey = AccessTools.Method(typeof(HotkeyComponent), "DrawHotkey", new[]
+            {
+                typeof(ICoreClientAPI), typeof(string), typeof(double), typeof(double),
+                typeof(Context), typeof(CairoFont), typeof(double), typeof(double),
+                typeof(double), typeof(double), typeof(double), typeof(double[]),
+            });
             MethodInfo? drawHelp = AccessTools.Method(typeof(DrawWorldInteractionUtil), "drawHelp", new[]
             {
                 typeof(Context), typeof(ImageSurface), typeof(ElementBounds),
@@ -72,6 +78,19 @@ internal static class GlyphPatcher
                     prefix:    Ref(nameof(GlyphPatches.GenHotkeyTexture_Prefix)),
                     finalizer: Ref(nameof(GlyphPatches.GenHotkeyTexture_Finalizer)));
                 session.Vtml.MarkActive();
+            }
+
+            // ── P4 · arte ──
+            // Es el único canal que puede caerse sin llevarse nada: sin él, las
+            // caras de PlayStation salen como texto ("Cross"), que es lo que hacían
+            // hasta la etapa 3.
+            if (drawHotkey is null || drawHotkey.ReturnType != typeof(double))
+                Fail(session, ref artFailure, session.Art,
+                     "HotkeyComponent.DrawHotkey(12 args) cambió de firma");
+            else
+            {
+                harmony.Patch(drawHotkey, prefix: Ref(nameof(GlyphPatches.DrawHotkey_Prefix)));
+                session.Art.MarkActive();
             }
 
             // ── P3 ──
@@ -119,6 +138,7 @@ internal static class GlyphPatcher
                      (session.Rewrite, rewriteFailure),
                      (session.Vtml, vtmlFailure),
                      (session.Sign, signFailure),
+                     (session.Art, artFailure),
                  })
         {
             if (failure is null) channel.MarkActive();
