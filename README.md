@@ -229,6 +229,11 @@ Para que las GUIs vanilla del juego (inventario, knapping, anvil, dialogs varios
 
 Todo esto es legítimo dentro del modelo de mods de VS (la API está pública), pero implica que el mod tiene acceso al stack de input del cliente y puede generar eventos que el juego trata como si vinieran del usuario. **Si te incomoda ese patrón para tu setup, no uses el mod.** No envía nada a la red, no toca archivos fuera de `ModConfig/gamepadcompanion.json`, y no tiene bloques `unsafe`, pero es honesto decir cómo trabaja antes de que lo instales.
 
-## Licencia
+## Licencia y créditos
 
 MIT — ver [LICENSE](LICENSE).
+
+Los cuatro símbolos de las caras de PlayStation los dibuja el mod como formas
+vectoriales: no se empaqueta arte de terceros. El pack [Kenney Input
+Prompts](https://kenney.nl/assets/input-prompts) (CC0) se usó como referencia visual
+mientras se decidía cómo tenían que verse.

@@ -1,0 +1,84 @@
+GamepadCompanion v1.12.0
+
+New: the game's key hints show your controller's buttons
+
+  Suggested by nolepguy (#8). With a controller connected, the hints Vintage
+  Story draws itself stop naming keyboard keys and name your buttons instead.
+  Where a chest used to say "right mouse: Open" it now says "[LT]: Open", and
+  "Shift + right mouse: Put in stack" becomes "[RS*] + [LT]".
+
+  It covers the help sign on the block you are looking at, the hint for the item
+  in your hand, the survival handbook and item tooltips. Two places are left
+  alone on purpose. Settings > Controls keeps showing keys, because that screen
+  is where you bind them and the game compares those names to detect conflicts.
+  And the hotbar numbers stay as numbers: with a gamepad the D-pad cycles slots
+  rather than selecting one, so there is no button that would be true there.
+
+  Pick the icon set in the settings dialog, in the new "Hints" tab, or with
+  .gpglyphs <xbox|playstation|nintendo|off>. Left on automatic it works the set
+  out from the controller you have plugged in, and the tab shows in brackets
+  what it decided — a GameSir Cyclone 2 speaks the DualShock protocol but has
+  A/B/X/Y printed on it, and that is the kind of thing only the mod knows. The
+  tab also draws a live preview of a hint line, so you can see the result
+  without going to find a chest.
+
+  On PlayStation the four face buttons are drawn as the real symbols, not as the
+  words: cross, circle, square, triangle. They are vector shapes drawn with the
+  same outline as the surrounding letters, so they stay legible over the bright
+  world, inside a cave and on the handbook's dark parchment, at any interface
+  scale.
+
+  About the asterisk. L3 and R3 in this mod are toggles: you press once to turn
+  the modifier on and press again to turn it off, you do not hold them. A hint
+  that read "[RS] + [LT]" would be telling you to hold RS, so those labels are
+  marked "RS*" instead. It affects a good quarter of the game's hints, so it is
+  worth knowing what the mark means.
+
+  A hint line is converted whole or not at all. If any part of a line cannot be
+  said honestly with a button — a shortcut that carries a Ctrl or Alt modifier,
+  say — the entire line stays on the keyboard, because half a line in buttons
+  and half in keys reads worse than either.
+
+  If you have a controller plugged in but play on the keyboard, .gpglyphs off
+  turns the whole thing back to normal.
+
+Changed
+
+- The Ctrl and Shift indicators in the corner now say SPRINT and SNEAK. For
+  someone playing on a controller "CTRL" does not mean anything: the button is
+  L3 or R3 and what it does is run or crouch. The wording is the game's own, the
+  one you already saw in Settings > Controls. Keep in mind they are still the
+  Shift and Ctrl keys underneath, so they are also the modifier for clicks —
+  sneak is shift-click to stack, sprint is ctrl-click to place.
+
+Fixes
+
+- A damaged settings file no longer disables the whole mod. The game reads that
+  file with no error handling of its own, so a stray comma left you with no
+  gamepad at all and a single line in the log to explain it. The mod now starts
+  with default settings and keeps the unreadable file next to the new one, with
+  the date in the name, so nothing you configured is lost.
+
+- A "hold key" binding assigned to a wheel slot is no longer discarded when the
+  settings are saved. The wheel and the gamepad buttons each had their own copy
+  of the code that writes bindings to disk, and the wheel's copy never learnt
+  about that binding type, so it was dropped silently — not even downgraded to a
+  normal key press. There is one copy now.
+
+- Labels in the Sensitivity tab no longer wrap onto two lines and collide with
+  the row underneath. "Horizontal sensitivity" and the trigger swap label did
+  not fit the space they were given, in English and in both Spanish variants.
+  This had been there for a while.
+
+Note about the chat commands
+
+  Every command in this mod is a client command, so it takes a dot and not a
+  slash: .gpconfig, not /gpconfig. The readme had been getting this wrong since
+  the beginning. A slash sends the command to the server, which does not know
+  it and answers that no such command exists.
+
+Credits
+
+  The four PlayStation face symbols are drawn by the mod as vector shapes; no
+  third-party artwork ships with it. Kenney's Input Prompts pack (CC0) was used
+  as a visual reference while working out how they should look.

@@ -1,0 +1,92 @@
+GamepadCompanion — descripción para la página de ModDB
+(en inglés, que es el idioma de la página; el texto va tal cual)
+
+================================================================================
+
+Play Vintage Story with a controller.
+
+Vintage Story has no gamepad support of its own. This mod adds it: movement and
+camera on the sticks, a radial menu for the things a controller has no buttons
+left for, a cursor you can drive around inventories, and — since 1.12.0 — the
+game's own key hints showing your controller's buttons instead of keyboard keys.
+
+It is a client mod. Nothing is required on the server, and you can join any
+server with it.
+
+
+WHAT IT DOES
+
+The game's hints speak your controller
+  Look at a chest and the help sign says "[LT]: Open" instead of naming a mouse
+  button. The same goes for the hint on the item in your hand, the survival
+  handbook and item tooltips. Xbox, PlayStation and Nintendo icon sets, picked
+  automatically from the controller you plugged in, or chosen by hand. On
+  PlayStation the four face buttons are drawn as the real symbols.
+
+Movement and camera
+  Sticks, with separate horizontal and vertical sensitivity, an adjustable dead
+  zone and optional pitch inversion. A precision mode on D-pad up divides the
+  camera speed for aiming at a specific block.
+
+A radial menu
+  Hold LB and pick with the right stick. Twelve slots, all configurable:
+  hotkeys, dialogs, single key presses, or several actions in sequence.
+
+A cursor for inventories
+  When a dialog is open a cursor appears. The D-pad jumps it slot by slot, which
+  is what you want most of the time; hold RB and the stick moves it freely. The
+  triggers click.
+
+Sneak and sprint as toggles
+  L3 and R3 turn them on and off rather than being held, with an indicator in
+  the corner. They are the game's Shift and Ctrl, so they double as the modifier
+  for clicks: stacking, placing, and anything else a mod hangs off them.
+
+Hold a key while a button is held
+  Some mods read a modifier key at the moment of the click. A normal key binding
+  sends the press and release in the same frame and misses that window, so there
+  is a separate binding type that keeps the key down for as long as you hold the
+  button.
+
+An on-screen keyboard
+  For chat and commands, so you can play without reaching for the keyboard.
+
+An in-game editor
+  Everything above is configured from a dialog, on the Insert key by default or
+  with .gpconfig. Settings persist to a JSON file.
+
+
+REQUIREMENTS
+
+Vintage Story 1.22 or later. Any controller the system exposes as a joystick.
+Tested on Linux and Windows with Xbox, DualShock/DualSense and GameSir pads,
+over USB and Bluetooth.
+
+
+IF YOUR CONTROLLER IS NOT PICKED UP
+
+Some devices that are not gamepads present themselves as joysticks — RGB
+controllers on motherboards, keyboards with programmable keys. Run .gpdevice to
+see every joystick the game can see, which one is in use and why the others were
+skipped, and .gpdevice <number> to force the right one.
+
+All the mod's commands are client commands: they take a dot, not a slash.
+
+
+A NOTE ON HOW IT WORKS
+
+The mod writes synthetic input into the client — mouse buttons, keys, camera
+movement — through the game's own input pipeline, so the rest of the game and
+other mods see it exactly as they would see a real keyboard and mouse. That is
+what makes it work with mods it knows nothing about. It sends nothing over the
+network, touches no file outside its own settings, and has no unsafe code, but
+it is honest to say how it works before you install it.
+
+
+CREDITS AND LICENCE
+
+MIT. Source and issue tracker on GitHub.
+
+The four PlayStation face symbols are drawn by the mod as vector shapes; no
+third-party artwork ships with it. Kenney's Input Prompts pack (CC0) was used as
+a visual reference while working out how they should look.
