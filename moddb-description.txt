@@ -1,92 +1,103 @@
 GamepadCompanion — descripción para la página de ModDB
-(en inglés, que es el idioma de la página; el texto va tal cual)
+(en inglés, como la original; parte de la descripción anterior con lo de 1.12.0
+integrado. Los cambios respecto de la versión previa están listados al final de
+este archivo, después de la línea de corte, para que puedas revisarlos — esa
+parte NO va a la página.)
 
 ================================================================================
 
-Play Vintage Story with a controller.
+Full native gamepad support for Vintage Story 1.22+, designed as a client-side mod. No Steam Input, AntiMicro, or external key mappers required — the mod reads the gamepad directly via GLFW and integrates with VS hotkeys, dialogs, and inventory UIs.
 
-Vintage Story has no gamepad support of its own. This mod adds it: movement and
-camera on the sticks, a radial menu for the things a controller has no buttons
-left for, a cursor you can drive around inventories, and — since 1.12.0 — the
-game's own key hints showing your controller's buttons instead of keyboard keys.
+> **Language**: the in-game UI is localized in **English** and **Spanish** (Latin American and European), following your VS client language, with English as fallback for everything else. Want it in your language? PRs are welcome at the GitHub repo — it's just one JSON file in `assets/gamepadcompanion/lang/`, no code changes needed.
 
-It is a client mod. Nothing is required on the server, and you can join any
-server with it.
+## Features
 
+- **The game's own key hints show your buttons.** Look at a chest and the help sign reads `[LT]: Open` instead of naming a mouse button; `Shift + right mouse` becomes `[RS*] + [LT]`. It covers the block help sign, the hint for the item in your hand, the survival handbook and item tooltips. Xbox, PlayStation and Nintendo icon sets, worked out automatically from the controller you plugged in or picked by hand. On PlayStation the four face buttons are drawn as the real symbols (✕ ○ □ △), as vector shapes with the same outline as the surrounding text, so they stay legible over the world, in a cave and on the handbook's parchment at any interface scale.
+- **Movement and camera** via sticks, with configurable sensitivity (horizontal/vertical), dead zone, and pitch inversion.
+- **12-slot radial menu** (LB + right stick). Defaults to Character, Chat, Handbook, Settings, and Virtual Keyboard; the remaining slots are assignable from the in-game dialog.
+- **Contextual button mapping**: B closes the open dialog or drops the active item depending on context; A jumps; X/Y/Back/Start mapped to tool mode, inventory, map, and pause menu.
+- **Virtual cursor over GUIs**: when a modal dialog is open, a yellow cursor appears. Hold RB for smooth right-stick movement; DPad without RB steps it slot-by-slot for fast inventory navigation. RT/LT click left/right.
+- **World map zoom with the D-Pad**: with the fullscreen map open, D-Pad ↑/↓ zooms in/out (one mouse-wheel notch per press) while ←/→ keeps moving the cursor for clicking waypoints.
+- **Sneak and sprint toggles** via L3/R3 with a HUD indicator in the top-right corner. They are the game's Shift and Ctrl, so they double as the click modifier: shift-click in inventory, ctrl-click placement, and anything else a mod hangs off them.
+- **Precision mode** (DPad Up) reduces camera sensitivity by a configurable factor for aiming at specific blocks.
+- **Composite actions**: a single radial slot can execute several actions in sequence.
+- **Per-key injection** (`KeyPressAction`): bind any keyboard key to a slot or gamepad button — useful for hotkeys not in the vanilla list.
+- **Hold-a-key bindings**: some mods read a modifier key at the moment of the click, and a normal key binding sends press and release in the same frame, missing that window. A separate binding type keeps the key down for as long as the gamepad button is held.
+- **On-screen virtual keyboard** for typing commands and chat with the gamepad. QWERTY + `/` and `.` for slash commands.
+- **In-game editor** (`.gpconfig` or `Insert` by default): four tabs (Wheel, Buttons, Sensitivity, Hints) with automatic JSON persistence to `ModConfig/gamepadcompanion.json`. The Hints tab draws a live preview of a hint line, so you can see the icon set without going to find a chest.
+- **Localized UI** (English/Spanish): dialogs, pickers, HUD indicators, and radial labels follow the game language — including labels of already-saved bindings.
 
-WHAT IT DOES
+> **Chat commands take a dot, not a slash.** They are client commands: `.gpconfig`, not `/gpconfig`. A slash sends the command to the server, which does not know it. (The readme had this wrong until 1.12.0 — sorry.)
 
-The game's hints speak your controller
-  Look at a chest and the help sign says "[LT]: Open" instead of naming a mouse
-  button. The same goes for the hint on the item in your hand, the survival
-  handbook and item tooltips. Xbox, PlayStation and Nintendo icon sets, picked
-  automatically from the controller you plugged in, or chosen by hand. On
-  PlayStation the four face buttons are drawn as the real symbols.
+## Compatibility
 
-Movement and camera
-  Sticks, with separate horizontal and vertical sensitivity, an adjustable dead
-  zone and optional pitch inversion. A precision mode on D-pad up divides the
-  camera speed for aiming at a specific block.
+| Platform | Status |
+|----------|--------|
+| Linux | ✅ Thoroughly tested (CachyOS X11 + GameSir Cyclone 2) |
+| Windows | ✅ Verified by user reports (XInput controllers: Xbox 360, 8BitDo Ultimate 2C) |
+| macOS | ⚠️ Untested — cross-platform stack (GLFW / OpenTK / VS API), should work in theory |
 
-A radial menu
-  Hold LB and pick with the right stick. Twelve slots, all configurable:
-  hotkeys, dialogs, single key presses, or several actions in sequence.
+The mod bypasses GLFW's SDL gamepad-mapping database and reads the joystick raw, auto-detecting one of six layouts on first poll (check the client log for `detected ... layout`):
 
-A cursor for inventories
-  When a dialog is open a cursor appears. The D-pad jumps it slot by slot, which
-  is what you want most of the time; hold RB and the stick moves it freely. The
-  triggers click.
+| Controller | Status |
+|------------|--------|
+| Xbox 360 / One / Series (Linux and Windows) | ✅ xpad / WinXInput layouts |
+| Xbox One / Series over Bluetooth (Linux) | ✅ Dedicated layout |
+| GameSir Cyclone 2 (Xbox and PS4 modes) | ✅ Thoroughly tested |
+| 8BitDo, generic XInput-compatible | ✅ Same XInput layouts |
+| Generic PS4-like DirectInput (Wired Controller, etc.) | ✅ Auto-detected by signed-trigger signature |
+| X-D GamePad / SHANWAN PS3-DInput mode | ✅ Experimental — button map inferred, report issues |
+| DualSense / DualShock 4 (official) | ✅ Detected by Sony vendor id or by controller shape |
+| Switch Pro | ⚠️ Depends on driver mode |
+| Other non-xpad joysticks | ❌ Unknown layout, mappings will be off |
 
-Sneak and sprint as toggles
-  L3 and R3 turn them on and off rather than being held, with an indicator in
-  the corner. They are the game's Shift and Ctrl, so they double as the modifier
-  for clicks: stacking, placing, and anything else a mod hangs off them.
+If your controller is not recognized, `.gpaxes` dumps the raw axes to help diagnose, and `.gpdevice` lists every joystick the game can see, says which one is in use and why the others were skipped — some devices that are not gamepads present themselves as joysticks (RGB controllers on motherboards, keyboards with programmable keys), and `.gpdevice <number>` forces the right one.
 
-Hold a key while a button is held
-  Some mods read a modifier key at the moment of the click. A normal key binding
-  sends the press and release in the same frame and misses that window, so there
-  is a separate binding type that keeps the key down for as long as you hold the
-  button.
+For the button hints, `.gpglyphs` reports which icon set was chosen and why, and which button each key maps to. That one output is usually enough to diagnose a hint that shows the wrong button.
 
-An on-screen keyboard
-  For chat and commands, so you can play without reaching for the keyboard.
+## Steam Input
 
-An in-game editor
-  Everything above is configured from a dialog, on the Insert key by default or
-  with .gpconfig. Settings persist to a JSON file.
+If you launch Vintage Story through Steam, **disable Steam Input for this game** — otherwise you'll get double input (Steam sends synthetic keyboard/mouse + the mod reads the gamepad raw → camera at double speed, duplicated clicks).
 
+Steam → right-click Vintage Story → Properties → Controller → "Disable Steam Input". The rest of Steam (overlay, friends, playtime, screenshots) keeps working — only the gamepad remapping layer is turned off.
 
-REQUIREMENTS
+If your controller only shows up as a gamepad when Steam Input emulates it (typical for DualSense / DualShock 4 / Switch Pro), either use Steam Input in plain "Gamepad / X360 passthrough" mode (no kb/m remapping — the mod reads the virtual Xbox controller fine), or use an alternative driver (DS4Windows on Windows, `hid-playstation` on Linux) and disable Steam Input entirely.
 
-Vintage Story 1.22 or later. Any controller the system exposes as a joystick.
-Tested on Linux and Windows with Xbox, DualShock/DualSense and GameSir pads,
-over USB and Bluetooth.
+On the Steam Deck, note that the Flatpak build of Vintage Story cannot see `/dev/input` unless it is given access, so the mod finds no joysticks at all. Either grant it (`--device=all`) or use Steam Input, which is the supported path there.
 
+This mod is essentially an alternative to Steam Input *specific to VS*, with knowledge of vanilla hotkeys and dialogs that a generic mapper cannot have. Use one or the other, not both.
 
-IF YOUR CONTROLLER IS NOT PICKED UP
+## How it works internally (disclaimer)
 
-Some devices that are not gamepads present themselves as joysticks — RGB
-controllers on motherboards, keyboards with programmable keys. Run .gpdevice to
-see every joystick the game can see, which one is in use and why the others were
-skipped, and .gpdevice <number> to force the right one.
+To make vanilla GUIs react to the gamepad without per-dialog patches, the mod injects synthetic mouse and keyboard events into the VS engine: it writes `ClientMain.MouseCurrentX/Y`, calls `OnMouseDown` / `OnKeyDown` / `OnKeyPress` directly, and writes Ctrl/Shift state into `KeyboardState[]`.
 
-All the mod's commands are client commands: they take a dot, not a slash.
+Since 1.12.0 it also uses Harmony — the copy the game already ships — to patch four public methods so the key hints can name your buttons. The substitution only happens inside a window opened by those patches, which is why Settings > Controls, the conflict detector and the hotbar numbers are untouched by construction rather than by a list of exceptions. Each surface is a separate channel with its own breaker: if the game changes and one of them no longer applies, that surface goes back to keyboard hints and everything else keeps working. Nothing is ever unpatched, so reloading a world cannot stack patches.
 
+This is the legitimate VS modding API, but worth disclosing — the mod has access to the client input stack and generates events the game treats as if they came from the user. Nothing is sent over the network; no files are touched outside `ModConfig/gamepadcompanion.json`; no `unsafe` blocks. If that pattern makes you uncomfortable, don't install it.
 
-A NOTE ON HOW IT WORKS
-
-The mod writes synthetic input into the client — mouse buttons, keys, camera
-movement — through the game's own input pipeline, so the rest of the game and
-other mods see it exactly as they would see a real keyboard and mouse. That is
-what makes it work with mods it knows nothing about. It sends nothing over the
-network, touches no file outside its own settings, and has no unsafe code, but
-it is honest to say how it works before you install it.
-
-
-CREDITS AND LICENCE
+## Credits and licence
 
 MIT. Source and issue tracker on GitHub.
 
-The four PlayStation face symbols are drawn by the mod as vector shapes; no
-third-party artwork ships with it. Kenney's Input Prompts pack (CC0) was used as
-a visual reference while working out how they should look.
+The four PlayStation face symbols are drawn by the mod as vector shapes; no third-party artwork ships with it. Kenney's Input Prompts pack (CC0) was used as a visual reference while working out how they should look.
+
+================================================================================
+CAMBIOS RESPECTO DE LA DESCRIPCIÓN ANTERIOR (no va a la página)
+
+  1. Feature nueva arriba de todo: los hints del juego con los botones del mando.
+  2. "Ctrl and Shift toggles" → "Sneak and sprint toggles", que es lo que ahora
+     dice el HUD, aclarando que siguen siendo el modificador de los clicks.
+  3. Se agregó el bullet de "hold-a-key bindings", que existe desde la 1.8.0 y
+     nunca había estado en la descripción.
+  4. El editor pasa de tres tabs a cuatro (entra Hints, con la vista previa).
+  5. Todos los comandos con PUNTO en vez de barra, más el aviso explícito.
+     La descripción vieja decía /gpconfig y /gpaxes, y eso nunca funcionó.
+  6. "five layouts" → seis, y la tabla suma la fila de Xbox por Bluetooth.
+  7. DualSense / DualShock 4 pasa de ⚠️ "driver-dependent" a ✅: desde la 1.11.0
+     se detectan por vendor id o por forma. Si preferís ser conservador, se puede
+     dejar en ⚠️ — vos sabés mejor qué reportes llegaron.
+  8. Se agregaron .gpdevice y .gpglyphs al párrafo de diagnóstico.
+  9. Nota de Steam Deck / Flatpak y /dev/input.
+ 10. El disclaimer ahora dice que el mod usa Harmony y parchea cuatro métodos,
+     y cómo está acotado. Ese párrafo existe justamente para esto.
+ 11. Créditos y licencia al final.

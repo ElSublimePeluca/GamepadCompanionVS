@@ -77,6 +77,22 @@ Note about the chat commands
   the beginning. A slash sends the command to the server, which does not know
   it and answers that no such command exists.
 
+Nothing changed for your controller
+
+  Worth saying explicitly, because this release touched a lot: controller
+  detection is byte for byte the same as in 1.11.0. The layout autodetection was
+  not edited, and neither were the trigger routing, the camera, the virtual
+  cursor, the toggles or the world map zoom. The only change in that area is a
+  new read-only property that exposes the USB vendor id the mod was already
+  computing, which the hints use to work out the icon set.
+
+  The one genuinely new thing under the hood is Harmony: the mod now patches
+  four public methods of the game so the hints can name your buttons. It is
+  contained — each surface is a separate channel with its own breaker, so if a
+  future game update moves one of them, that surface goes back to keyboard hints
+  and everything else keeps working, and nothing is ever unpatched, so reloading
+  a world cannot stack patches.
+
 Credits
 
   The four PlayStation face symbols are drawn by the mod as vector shapes; no
