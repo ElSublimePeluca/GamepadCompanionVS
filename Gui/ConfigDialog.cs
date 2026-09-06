@@ -548,12 +548,21 @@ public sealed class ConfigDialog : GuiDialog
     // fijo del ícono, y el ícono sale por capi.Gui.Icons.DrawIcon, o sea por el
     // MISMO delegate que dibuja en el juego. No es una maqueta parecida — si el
     // painter decide rendirse y dejar el mouse de vanilla, acá se ve eso.
+    //
+    // Y se dibuja DENTRO de una ventana de reescritura, igual que drawHelp: sin
+    // eso la cápsula de la tecla sale de vanilla ("Shift") mientras el cartel de
+    // verdad ya muestra el botón, y la vista previa pasa a mentir. Es lo que
+    // pasaba entre la etapa 2 y la 3.
     private void DrawHintPreview(Context ctx, ElementBounds bounds)
     {
         // El Save va FUERA del try y el Restore en el finally: el contexto es
         // compartido con el resto del diálogo, y si algo tira después del
         // Translate el resto de la composición se dibujaría corrido.
         ctx.Save();
+        // sign: true porque esto ES una línea de cartel: así el arte de las caras
+        // usa el mismo avance compacto y el ícono de mouse respeta la misma regla
+        // de línea que allá.
+        GlyphScope.Token scope = GlyphScope.Enter(sign: true);
         try
         {
             double[] color = (double[])GuiStyle.DialogDefaultTextColor.Clone();
@@ -592,6 +601,7 @@ public sealed class ConfigDialog : GuiDialog
         }
         finally
         {
+            GlyphScope.Exit(scope);
             ctx.Restore();
         }
     }

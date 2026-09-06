@@ -332,6 +332,17 @@ internal static class GlyphTests
                 Check("el volcado de .gpglyphs no tira", false, e.ToString());
             }
 
+            // La vista previa de la tab Ayudas dibuja una línea de cartel abriendo
+            // una ventana `sign` y pidiéndole a la hotkey su PrimaryAsString, igual
+            // que drawHelp. Si eso no sustituyera, la vista previa mostraría
+            // "Shift" mientras el cartel de verdad muestra el botón — que es lo que
+            // pasó entre la etapa 2 y la 3.
+            var previewToken = GlyphScope.Enter(sign: true);
+            string? preview = ctx.Hotkeys["shift"].CurrentMapping.PrimaryAsString();
+            GlyphScope.Exit(previewToken);
+            Check("la vista previa de la tab Ayudas sustituye igual que el cartel",
+                  preview == "RS*", preview);
+
             // Todo-o-nada: con la ventana abierta pero la línea marcada como no
             // convertible, tampoco se sustituye.
             var token3 = GlyphScope.Enter(sign: true, convertible: false);
