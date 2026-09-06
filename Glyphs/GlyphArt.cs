@@ -125,23 +125,42 @@ internal sealed class GlyphArt : IDisposable
         Paint(ctx, symbol,
               plateX + (boxWidth - size) / 2.0,
               y + 1.0 + (lineheight - size) / 2.0,
-              size);
+              size, GuiStyle.DarkBrownColor);
 
         return (int)(x + symbolSpacing + (tight ? boxWidth : reserved));
     }
 
-    // Pinta el símbolo cuadrado, escalado, en (x, y). El Save/Restore es del
-    // llamador: acá se toca la matriz del contexto.
-    public static void Paint(Context ctx, ImageSurface surface, double x, double y, double size)
+    // Pinta el símbolo cuadrado, escalado, en (x, y), TEÑIDO.
+    //
+    // Se usan los PNG MONOCROMOS y se los tiñe, no los de color. Un motivo es de
+    // hardware — los símbolos van en color en un DualShock viejo, pero en un
+    // DualSense son todos del mismo tono, y esa es la convención de casi todos los
+    // sets de prompts — y otro es de acá: un disco magenta saturado al lado de
+    // texto gris claro se lee como un sticker pegado encima.
+    //
+    // El PNG se usa como MÁSCARA, no como imagen, y se tiñe con el marrón oscuro
+    // del contorno del texto: el disco queda oscuro y el símbolo, que en el arte
+    // es transparente, deja ver la placa clara. Es alto contraste y es la misma
+    // relación figura-fondo que un botón real. Probado también al revés (disco
+    // claro del color del texto): sin contorno no se lee, y con contorno postizo
+    // — repitiendo la máscara desplazada — queda sucio a este tamaño.
+    public static void Paint(Context ctx, ImageSurface surface, double x, double y,
+                             double size, double[] color)
     {
-        ctx.Save();
-        ctx.Translate(x, y);
-        ctx.Scale(size / SourceSize, size / SourceSize);
         var pattern = new SurfacePattern(surface) { Filter = Filter.Good };
-        ctx.SetSource(pattern);
-        ctx.Paint();
-        pattern.Dispose();
-        ctx.Restore();
+        ctx.Save();
+        try
+        {
+            ctx.Translate(x, y);
+            ctx.Scale(size / SourceSize, size / SourceSize);
+            ctx.SetSourceRGBA(color);
+            ctx.Mask(pattern);
+        }
+        finally
+        {
+            ctx.Restore();
+            pattern.Dispose();
+        }
     }
 
     public void Dispose()
