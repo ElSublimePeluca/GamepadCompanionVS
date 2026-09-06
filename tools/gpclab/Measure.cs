@@ -266,6 +266,63 @@ internal static class Measure
         return Directory.Exists(path) || File.Exists(path) ? path : null;
     }
 
+    // El camino de PROSA, que es otro mundo que el cartel: HotkeyComponent dibuja
+    // sobre SU PROPIA ImageSurface, con la fuente del texto que lo rodea (más
+    // chica y al 0,9), y esa textura se pega después sobre el pergamino oscuro del
+    // manual. Replicarlo acá es la única forma de ver por qué un glifo que se ve
+    // bien en el cartel puede quedar invisible en una página del manual.
+    public static int Prose(string gameRoot, string[] args)
+    {
+        PrintHeader(gameRoot);
+        string output = args.FirstOrDefault(a => !a.StartsWith('-'))
+                     ?? Path.Combine(Path.GetTempPath(), "gpclab-prose.png");
+        RuntimeEnv.GUIScale = 1.0f;
+        ICoreClientAPI capi = FakeApi(out _);
+
+        // Fondo del manual: pergamino oscuro.
+        const int w = 560, h = 260;
+        var surface = new ImageSurface(Format.Argb32, w, h);
+        var ctx = new Context(surface);
+        ctx.SetSourceRGBA(0.23, 0.18, 0.13, 1.0);
+        ctx.Rectangle(0, 0, w, h);
+        ctx.Fill();
+
+        // La fuente del richtext del manual, y el 0,9 que le aplica el componente.
+        var textFont = CairoFont.WhiteSmallText();
+        var capsuleFont = textFont.Clone().WithFontSize((float)textFont.UnscaledFontsize * 0.9f);
+
+        double y = 24;
+        foreach (var (title, label) in new[]
+                 {
+                     ("texto de vanilla:", (string?)null),
+                     ("glifo con arte:", "Square"),
+                 })
+        {
+            textFont.SetupContext(ctx);
+            capi.Gui.Text.DrawTextLine(ctx, textFont, title, 16, y);
+            double lineheight = (int)capsuleFont.GetFontExtents().Height;
+            double textHeight = capsuleFont.GetFontExtents().Height;
+            double plusWidth = capsuleFont.GetTextExtents("+").Width;
+
+            capsuleFont.SetupContext(ctx);
+            double x = 180;
+            if (label is null)
+                HotkeyComponent.DrawHotkey(capi, "Square", 0, y, ctx, capsuleFont, lineheight,
+                                           textHeight, plusWidth, 3.0, 4.0, capsuleFont.Color);
+            else
+                GlyphArt.DrawCapsule(capi, ctx, "Square", 0, y, capsuleFont, lineheight,
+                                     textHeight, plusWidth, 3.0, 4.0, capsuleFont.Color);
+            _ = x;
+            y += 60;
+        }
+
+        surface.WriteToPng(output);
+        ctx.Dispose();
+        surface.Dispose();
+        Console.WriteLine($"  escrito: {output}");
+        return 0;
+    }
+
     public static int Render(string gameRoot, string[] args)
     {
         PrintHeader(gameRoot);
@@ -349,21 +406,17 @@ internal static class Measure
                 // El cartel abre una ventana de scope y el avance del arte depende
                 // de eso, así que el harness la abre igual que el parche.
                 var signToken = GlyphScope.Enter(sign: true);
-                ImageSurface? cross = FaceArt("ps_cross");
                 double textH = font.GetFontExtents().Height;
                 double plusW = font.GetTextExtents("+").Width;
-                if (cross is not null)
-                    x = GlyphArt.DrawCapsule(capi, ctx, "Cross", cross, x, y, font, lh,
-                                             textH, plusW, 5.0, 10.0, font.Color);
+                x = GlyphArt.DrawCapsule(capi, ctx, "Cross", x, y, font, lh,
+                                         textH, plusW, 5.0, 10.0, font.Color);
                 MouseGlyph(ctx, "L2", ref x, y, font, lh);
                 Tail(capi, ctx, font, x, y, lh, ": Abrir");
                 x = 0; y += SignLineStep();
                 Stack(ctx, ref x, y, font, lh);
                 x = Hotkey(capi, "R3", x, y, ctx, font, lh);
-                ImageSurface? triangle = FaceArt("ps_triangle");
-                if (triangle is not null)
-                    x = GlyphArt.DrawCapsule(capi, ctx, "Triangle", triangle, x, y, font, lh,
-                                             textH, plusW, 5.0, 10.0, font.Color);
+                x = GlyphArt.DrawCapsule(capi, ctx, "Triangle", x, y, font, lh,
+                                         textH, plusW, 5.0, 10.0, font.Color);
                 Tail(capi, ctx, font, x, y, lh, ": Carry");
                 GlyphScope.Exit(signToken);
             }),
@@ -448,25 +501,6 @@ internal static class Measure
         Console.WriteLine("  filas por banda: " + string.Join(" · ", lines.Select(l => l.Label)));
         Console.WriteLine("  bandas: GUIScale 0.5 / 1.0 / 1.5 sobre cielo, y las mismas sobre cueva.");
         return 0;
-    }
-
-    // Los PNG de los glifos, leídos del repo. En el juego los carga el
-    // AssetManager; acá alcanza con abrirlos, porque lo que se está mirando es
-    // cómo quedan dibujados.
-    private static readonly Dictionary<string, ImageSurface?> faceArt = new();
-
-    private static ImageSurface? FaceArt(string name)
-    {
-        if (faceArt.TryGetValue(name, out ImageSurface? cached)) return cached;
-        ImageSurface? surface = null;
-        try
-        {
-            string? dir = FindRepoFile("assets/gamepadcompanion/textures/glyphs");
-            if (dir is not null) surface = new ImageSurface(Path.Combine(dir, name + ".png"));
-        }
-        catch (Exception e) { Console.WriteLine($"    (no pude abrir {name}.png: {e.Message})"); }
-        faceArt[name] = surface;
-        return surface;
     }
 
     private static int ZoomFactor(string[] args)

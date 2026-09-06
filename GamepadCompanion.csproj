@@ -79,13 +79,6 @@
       <HintPath>$(VINTAGE_STORY)/Lib/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- Lo pide BitmapExternal, que es lo que devuelve IAsset.ToBitmap y lo que come
-         GuiElement.getImageSurfaceFromAsset para cargar los PNG de los glifos.
-         Private=false igual que el resto: lo trae el juego. -->
-    <Reference Include="SkiaSharp">
-      <HintPath>$(VINTAGE_STORY)/Lib/SkiaSharp.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
     <Reference Include="cairo-sharp">
       <HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
       <Private>false</Private>

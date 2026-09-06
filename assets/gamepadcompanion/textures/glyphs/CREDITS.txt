@@ -1,8 +1,0 @@
-Los cuatro simbolos de las caras de PlayStation salen de "Kenney Input Prompts"
-(https://kenney.nl/assets/input-prompts), publicado bajo CC0 1.0 Universal, o sea
-dominio publico: no exige atribucion. Va igual porque corresponde.
-
-Archivos: playstation_button_{cross,circle,square,triangle}.png, la variante
-MONOCROMA, sin modificar mas que el renombre. El mod los usa como mascara y los
-tine en runtime con el mismo marron del contorno del texto, asi que el color de
-origen del PNG no importa.

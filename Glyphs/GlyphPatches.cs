@@ -130,10 +130,7 @@ internal static class GlyphPatches
 
         try
         {
-            ImageSurface? symbol = s.Artwork.Get(keycode);
-            if (symbol is null) return true;          // que dibuje vanilla el texto
-
-            __result = GlyphArt.DrawCapsule(capi, ctx, keycode, symbol, x, y, font, lineheight,
+            __result = GlyphArt.DrawCapsule(capi, ctx, keycode, x, y, font, lineheight,
                                             textHeight, pluswdith, symbolspacing,
                                             leftRightPadding, color);
             return false;

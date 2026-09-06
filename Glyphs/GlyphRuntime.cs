@@ -30,7 +30,6 @@ internal sealed class GlyphSession
         var off = ParseChannelsOff(config.GlyphChannelsOff);
         Icons   = new GlyphChannel("icons",   Logger, off.Contains("icons"));
         Art     = new GlyphChannel("art",     Logger, off.Contains("art"));
-        Artwork = new GlyphArt(capi, Art);
         Rewrite = new GlyphChannel("rewrite", Logger, off.Contains("rewrite"));
         Sign    = new GlyphChannel("sign",    Logger, off.Contains("sign"));
         Vtml    = new GlyphChannel("vtml",    Logger, off.Contains("vtml"));
@@ -55,7 +54,6 @@ internal sealed class GlyphSession
 
     public GlyphChannel Icons { get; }     // IconUtil.CustomIcons, sin Harmony
     public GlyphChannel Art { get; }       // los símbolos de las caras de PlayStation
-    public GlyphArt Artwork { get; }
     public GlyphChannel Rewrite { get; }   // sustitución de texto de la tecla
     public GlyphChannel Sign { get; }      // cartel flotante
     public GlyphChannel Vtml { get; }      // tags <hk> en prosa
@@ -99,11 +97,5 @@ internal static class GlyphRuntime
     // desconexión y crash del hilo de cliente. Dispose queda como respaldo:
     // si StartClientSide llegó a tirar, el ModSystem desaparece de
     // enabledSystems y Dispose no corre nunca.
-    internal static void Clear()
-    {
-        // El arte son ImageSurfaces nativas: hay que soltarlas, y antes de perder
-        // la referencia a la sesión.
-        try { Session?.Artwork.Dispose(); } catch { }
-        Session = null;
-    }
+    internal static void Clear() => Session = null;
 }

@@ -373,22 +373,8 @@ internal static class GlyphTests
         Check("una etiqueta que no es cara no dispara el arte",
               !GlyphArt.IsFaceLabel("L2") && !GlyphArt.IsFaceLabel("RS*"), "disparó");
 
-        // Y los cuatro PNG tienen que estar en el repo con el nombre que espera.
-        string? dir = FindAssets();
-        if (dir is null) { Check("los PNG del arte están en assets/", false, "no encontré la carpeta"); return; }
-        foreach (string file in new[] { "ps_cross.png", "ps_circle.png", "ps_square.png", "ps_triangle.png" })
-            Check($"existe {file}", File.Exists(Path.Combine(dir, file)), "falta");
     }
 
-    private static string? FindAssets()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "GamepadCompanion.csproj")))
-            dir = dir.Parent;
-        if (dir is null) return null;
-        string path = Path.Combine(dir.FullName, "assets", "gamepadcompanion", "textures", "glyphs");
-        return Directory.Exists(path) ? path : null;
-    }
 
     // ── andamio ───────────────────────────────────────────────────────────────
 

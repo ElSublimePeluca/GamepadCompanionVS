@@ -99,6 +99,9 @@ internal static class Program
                 case "boxes":
                     SetupFonts(root);
                     return RunBoxes(root);
+                case "prose":
+                    SetupFonts(root);
+                    return RunProse(root, rest);
                 case "render":
                     SetupFonts(root);
                     return RunRender(root, rest);
@@ -137,6 +140,9 @@ internal static class Program
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int RunBoxes(string root) => Measure.Boxes(root);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static int RunProse(string root, string[] args) => Measure.Prose(root, args);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int RunRender(string root, string[] args) => Measure.Render(root, args);

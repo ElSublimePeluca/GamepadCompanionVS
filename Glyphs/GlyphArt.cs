@@ -4,86 +4,43 @@ using System;
 using System.Collections.Generic;
 using Cairo;
 using Vintagestory.API.Client;
-using Vintagestory.API.Common;
 
-// Los cuatro símbolos de las caras de PlayStation, en PNG.
+// Los cuatro símbolos de las caras de PlayStation, dibujados como PATHS DE CAIRO.
 //
-// PNG y no SVG a propósito: la rama sin tinte de SvgLoader NO premultiplica el
-// alfa, y los composers del juego trabajan con alfa premultiplicado, así que un
-// SVG a color sale con halo. Un PNG cargado a ImageSurface y compuesto con Cairo
-// es compositing de verdad.
+// La primera versión usaba los PNG de Kenney (CC0) y se descartó después de
+// mirarlos en los dos lugares donde aparecen:
 //
-// El símbolo se dibuja DENTRO de la caja que el string ya midió: la cápsula la
-// sigue dimensionando el texto ("Cross"), así que el avance de retorno es
-// idéntico al de vanilla y ninguna medición río arriba se entera. Es la única
-// forma de meter arte sin romper el ancho reservado — ni el mod competidor lo
-// resolvió, y por eso dibuja un cuadrado.
-internal sealed class GlyphArt : IDisposable
+//   · En el cartel la cápsula mide ~23 px y el bitmap se veía bien.
+//   · En una página del manual mide 14 px, y ahí cualquier bitmap es un borrón —
+//     mientras que la palabra "Square" se lee perfecto a ese tamaño.
+//   · Y el tinte no tiene una respuesta única: el cartel flota sobre el mundo
+//     (claro) y el manual sobre pergamino (oscuro), así que un color fijo se
+//     pierde en uno de los dos.
+//
+// Un path no tiene ninguno de esos problemas: es nítido a cualquier tamaño y se
+// le puede dar EL MISMO tratamiento que a las letras de al lado — contorno marrón
+// oscuro y relleno del color del texto — que es justamente lo que hace que las
+// letras se lean sobre cualquier fondo. De paso el mod no necesita empaquetar
+// ninguna textura ni depender de cómo el AssetManager decodifica un PNG con
+// paleta.
+internal static class GlyphArt
 {
-    // Tamaño nativo de los PNG de Kenney.
-    private const int SourceSize = 64;
+    private static readonly HashSet<string> Faces =
+        new(StringComparer.Ordinal) { "Cross", "Circle", "Square", "Triangle" };
 
-    private static readonly Dictionary<string, string> ByLabel = new(StringComparer.Ordinal)
-    {
-        ["Cross"]    = "ps_cross.png",
-        ["Circle"]   = "ps_circle.png",
-        ["Square"]   = "ps_square.png",
-        ["Triangle"] = "ps_triangle.png",
-    };
+    // Barato y sin estado: lo llama el prefix en cada cápsula que dibuja.
+    public static bool IsFaceLabel(string? label) => label is not null && Faces.Contains(label);
 
-    private readonly ICoreClientAPI capi;
-    private readonly GlyphChannel channel;
-    private readonly Dictionary<string, ImageSurface?> cache = new(StringComparer.Ordinal);
-
-    public GlyphArt(ICoreClientAPI capi, GlyphChannel channel)
-    {
-        this.capi = capi;
-        this.channel = channel;
-    }
-
-    // Barato y sin tocar disco: lo llama el prefix en cada cápsula que dibuja.
-    public static bool IsFaceLabel(string? label)
-        => label is not null && ByLabel.ContainsKey(label);
-
-    // Carga perezosa: si nadie usa el set de PlayStation, el arte no se lee nunca.
-    // Un fallo se cachea como null para no reintentar por cápsula.
-    public ImageSurface? Get(string label)
-    {
-        if (cache.TryGetValue(label, out ImageSurface? cached)) return cached;
-        if (!ByLabel.TryGetValue(label, out string? file)) return null;
-
-        ImageSurface? surface = null;
-        try
-        {
-            IAsset? asset = capi.Assets.TryGet(
-                new AssetLocation("gamepadcompanion", "textures/glyphs/" + file));
-            if (asset is null)
-                channel.MarkUnavailable("falta la textura textures/glyphs/" + file);
-            else if (asset.ToBitmap(capi) is BitmapExternal bitmap)
-            {
-                using (bitmap)
-                    surface = GuiElement.getImageSurfaceFromAsset(bitmap, SourceSize, SourceSize);
-            }
-        }
-        catch (Exception e)
-        {
-            channel.ReportFailure(e);
-        }
-
-        cache[label] = surface;
-        return surface;
-    }
-
-    // La cápsula entera, con el símbolo adentro. Replica DrawHotkey de vanilla con
+    // La cápsula entera con el símbolo adentro. Replica DrawHotkey de vanilla con
     // el mismo orden y las mismas cuentas — incluido el cast a int del avance —
     // cambiando sólo el texto por el símbolo. Devuelve el avance.
     //
-    // Vive acá y no dentro del prefix para que el harness offline
-    // (`gpclab render`) dibuje EXACTAMENTE esto y no una copia.
+    // Vive acá y no dentro del prefix para que el harness offline lo dibuje
+    // EXACTAMENTE igual y no con una copia.
     public static double DrawCapsule(ICoreClientAPI capi, Context ctx, string label,
-                                     ImageSurface symbol, double x, double y, CairoFont font,
-                                     double lineheight, double textHeight, double plusWidth,
-                                     double symbolSpacing, double leftRightPadding, double[] color)
+                                     double x, double y, CairoFont font, double lineheight,
+                                     double textHeight, double plusWidth, double symbolSpacing,
+                                     double leftRightPadding, double[] color)
     {
         if (x > 0.0)
         {
@@ -94,24 +51,24 @@ internal sealed class GlyphArt : IDisposable
 
         double width = font.GetTextExtents(label).Width;
         double reserved = (int)(width + GuiElement.scaled(leftRightPadding * 2.0));
-        // La PLACA es cuadrada aunque el texto que la midió sea "Triangle": un
+        // La placa es cuadrada aunque el texto que la midió sea "Triangle": un
         // símbolo cuadrado centrado en una caja de 76 px se ve como un punto
         // perdido adentro de una caja vacía.
         double boxWidth = Math.Min(reserved, lineheight);
 
-        // Y el avance depende de DÓNDE estamos, que no es un capricho:
+        // El avance depende de DÓNDE estamos, y no es un capricho:
         //
         //  · En el CARTEL el ancho se acumula mientras se dibuja (drawHelp suma los
         //    retornos y recién al final escribe ActualWidth), así que se puede
-        //    devolver el ancho real de la placa. La línea queda más compacta y con
+        //    devolver el ancho real de la placa: la línea queda más compacta y con
         //    más aire contra el techo de 600, justo donde "Triangle" era el peor
         //    caso. Ahí la placa va pegada a la izquierda, o se saldría del avance.
         //  · En PROSA no se puede: el ancho ya lo reservó DisplayText midiendo el
         //    texto, antes de dibujar. Se devuelve lo mismo que vanilla y la placa
-        //    se centra en ese espacio; sobra aire, que es mucho menos feo que
-        //    desalinear la textura.
+        //    se centra en ese espacio.
         bool tight = GlyphScope.InSign;
         double plateX = tight ? x + 1.0 : x + 1.0 + (reserved - boxWidth) / 2.0;
+
         GuiElement.RoundRectangle(ctx, plateX, y + 1.0, boxWidth, lineheight, 3.5);
         ctx.SetSourceRGBA(color);
         ctx.LineWidth = 1.5;
@@ -119,53 +76,61 @@ internal sealed class GlyphArt : IDisposable
         ctx.SetSourceRGBA(color[0], color[1], color[2], color[3] * 0.5);
         ctx.Fill();
 
-        // Cuadrado y centrado en la caja. 0,72 del alto de línea deja el símbolo
-        // del porte de una mayúscula de la fuente de al lado.
-        double size = lineheight * 0.78;
-        Paint(ctx, symbol,
-              plateX + (boxWidth - size) / 2.0,
-              y + 1.0 + (lineheight - size) / 2.0,
-              size, GuiStyle.DarkBrownColor);
+        DrawFace(ctx, label, plateX + boxWidth / 2.0, y + 1.0 + lineheight / 2.0,
+                 lineheight * 0.30, color);
 
         return (int)(x + symbolSpacing + (tight ? boxWidth : reserved));
     }
 
-    // Pinta el símbolo cuadrado, escalado, en (x, y), TEÑIDO.
-    //
-    // Se usan los PNG MONOCROMOS y se los tiñe, no los de color. Un motivo es de
-    // hardware — los símbolos van en color en un DualShock viejo, pero en un
-    // DualSense son todos del mismo tono, y esa es la convención de casi todos los
-    // sets de prompts — y otro es de acá: un disco magenta saturado al lado de
-    // texto gris claro se lee como un sticker pegado encima.
-    //
-    // El PNG se usa como MÁSCARA, no como imagen, y se tiñe con el marrón oscuro
-    // del contorno del texto: el disco queda oscuro y el símbolo, que en el arte
-    // es transparente, deja ver la placa clara. Es alto contraste y es la misma
-    // relación figura-fondo que un botón real. Probado también al revés (disco
-    // claro del color del texto): sin contorno no se lee, y con contorno postizo
-    // — repitiendo la máscara desplazada — queda sucio a este tamaño.
-    public static void Paint(Context ctx, ImageSurface surface, double x, double y,
-                             double size, double[] color)
+    // El símbolo, centrado en (cx, cy) con radio r. Mismo tratamiento que el texto
+    // de al lado: se traza el contorno grueso en marrón oscuro y encima el trazo
+    // fino del color del texto. Es lo que hace legibles a las letras sobre
+    // cualquier fondo, y por eso funciona igual sobre el mundo y sobre pergamino.
+    public static void DrawFace(Context ctx, string label, double cx, double cy,
+                                double r, double[] color)
     {
-        var pattern = new SurfacePattern(surface) { Filter = Filter.Good };
         ctx.Save();
         try
         {
-            ctx.Translate(x, y);
-            ctx.Scale(size / SourceSize, size / SourceSize);
+            Path(ctx, label, cx, cy, r);
+            ctx.LineCap = LineCap.Round;
+            ctx.LineJoin = LineJoin.Round;
+            ctx.LineWidth = Math.Max(2.4, r * 0.62);
+            ctx.SetSourceRGBA(GuiStyle.DarkBrownColor);
+            ctx.StrokePreserve();
+            ctx.LineWidth = Math.Max(1.0, r * 0.30);
             ctx.SetSourceRGBA(color);
-            ctx.Mask(pattern);
+            ctx.Stroke();
         }
-        finally
-        {
-            ctx.Restore();
-            pattern.Dispose();
-        }
+        finally { ctx.Restore(); }
     }
 
-    public void Dispose()
+    private static void Path(Context ctx, string label, double cx, double cy, double r)
     {
-        foreach (ImageSurface? surface in cache.Values) surface?.Dispose();
-        cache.Clear();
+        ctx.NewPath();
+        switch (label)
+        {
+            case "Cross":
+                double d = r * 0.78;              // la ✕ se dibuja dentro del círculo
+                ctx.MoveTo(cx - d, cy - d); ctx.LineTo(cx + d, cy + d);
+                ctx.MoveTo(cx - d, cy + d); ctx.LineTo(cx + d, cy - d);
+                break;
+            case "Circle":
+                ctx.Arc(cx, cy, r * 0.86, 0.0, Math.PI * 2.0);
+                break;
+            case "Square":
+                double s = r * 0.76;
+                ctx.Rectangle(cx - s, cy - s, s * 2.0, s * 2.0);
+                ctx.ClosePath();
+                break;
+            case "Triangle":
+                // Centroide en cy, para que no se vea caído dentro de la cápsula.
+                double t = r * 0.98;
+                ctx.MoveTo(cx, cy - t);
+                ctx.LineTo(cx + t * 0.92, cy + t * 0.72);
+                ctx.LineTo(cx - t * 0.92, cy + t * 0.72);
+                ctx.ClosePath();
+                break;
+        }
     }
 }

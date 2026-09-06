@@ -41,6 +41,11 @@
       <HintPath>$(VINTAGE_STORY)/VintagestoryLib.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Lo pide BitmapExternal, que es como el juego carga los PNG de los glifos. -->
+    <Reference Include="SkiaSharp">
+      <HintPath>$(VINTAGE_STORY)/Lib/SkiaSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="cairo-sharp">
       <HintPath>$(VINTAGE_STORY)/Lib/cairo-sharp.dll</HintPath>
       <Private>false</Private>
