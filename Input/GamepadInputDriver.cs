@@ -21,6 +21,7 @@ public sealed class GamepadInputDriver
     private readonly RadialMenuDialog radial;
     private readonly VirtualCursor cursor;
     private readonly CursorClickMapper cursorClicks;
+    private readonly CursorNavigator cursorNavigator;
     private readonly WorldMapZoomMapper worldMapZoom;
 
     public ToggleManager Toggles => toggles;
@@ -47,7 +48,8 @@ public sealed class GamepadInputDriver
         triggers = new TriggerMapper(capi, buttons);
         toggles = new ToggleManager(capi);
         radial = new RadialMenuDialog(capi);
-        cursorClicks = new CursorClickMapper(capi, cursor);
+        cursorClicks = new CursorClickMapper(capi, cursor, buttons);
+        cursorNavigator = new CursorNavigator(capi, cursor);
         worldMapZoom = new WorldMapZoomMapper(capi);
     }
 
@@ -172,11 +174,13 @@ public sealed class GamepadInputDriver
         buttons.ApplyHoldPresses(current, previous);
 
         // Cursor virtual aparece SIEMPRE que hay un GuiDialog (modal) abierto.
-        // RB held = modo smooth: stick derecho mueve continuo + RT/LT clickean.
-        // RB suelto = modo slot: DPad salta cursor por pasos del tamaño de un
-        // slot de inventario, ideal para navegar inventario/cofres sin arrastrar
-        // con el stick. RT/LT siguen clickeando en ambos modos.
-        bool smoothMode = current.IsDown(GamepadButton.RightBumper);
+        // Stick derecho: lo mueve libre, como un mouse. DPad: salta al slot,
+        // celda o botón más cercano en esa dirección. RT o A hacen click
+        // izquierdo (un solo botón, ver CursorClickMapper) y LT el derecho.
+        //
+        // Hasta el issue #9 el stick sólo lo movía con RB mantenido y el DPad
+        // saltaba 52 px a ciegas. Por qué existía ese RB, y por qué ya no hace
+        // falta, está en CursorNavigator.
         if (cursorActive)
         {
             // Si abrimos la dialog con LT mid-press (ej. cofre), el
@@ -189,24 +193,17 @@ public sealed class GamepadInputDriver
             cursor.Show(fw, fh);
             // WorldMap (full-screen): DPad↑/↓ hacen zoom emitiendo MouseWheel
             // al dialog en vez de mover el cursor virtual. DPad←/→ siguen
-            // navegando con step para que el cursor pueda alcanzar waypoints
-            // o botones de UI del mapa.
+            // con el paso fijo para que el cursor pueda recorrer el mapa y
+            // alcanzar waypoints.
             bool worldMapZooming = worldMapZoom.Apply(current, previous);
-            if (smoothMode)
-            {
-                cursor.Update(current.RightStickX, current.RightStickY, dt,
-                              fw, fh);
-            }
-            else
-            {
-                ApplyDPadStep(current, previous, fw, fh,
-                              skipVertical: worldMapZooming);
-                // En step mode el cursor no se mueve entre pulsos del DPad,
-                // pero seguimos sincronizando OS/ClientMain por frame para
-                // que el render del item arrastrado en HudDropItem no se
-                // quede pegado a la última posición del mouse físico.
-                cursor.Sync();
-            }
+            bool moved = cursor.Update(current.RightStickX, current.RightStickY,
+                                       config.Deadzone, dt, fw, fh);
+            moved |= cursorNavigator.Apply(current, previous, fw, fh,
+                                           worldMap: worldMapZooming);
+            // En un frame sin movimiento seguimos sincronizando OS/ClientMain
+            // para que el render del item arrastrado en HudDropItem no se
+            // quede pegado a la última posición del mouse físico.
+            if (!moved) cursor.Sync();
             // Si el usuario tomó el mouse físico, no inyectamos clicks del
             // gamepad: apuntarían a la posición (vieja) del cursor virtual.
             // El mouse físico y sus botones manejan el dialog.
@@ -257,26 +254,6 @@ public sealed class GamepadInputDriver
         cursor.Hide();
         toggles.ProjectKeyboardState(injecting: false);
         triggers.ProjectMouseKeyCodes(injecting: false);
-    }
-
-    // Tamaño del salto del cursor con DPad. ~52 px coincide con el ancho
-    // típico de un slot de inventario en VS (incluyendo bordes), así
-    // moverse en horizontal salta exactamente al slot adyacente. Vertical
-    // usa el mismo valor — la grilla del inventario es uniforme.
-    private const int SlotStepPx = 52;
-
-    private void ApplyDPadStep(GamepadState current, GamepadState previous,
-                               int fw, int fh, bool skipVertical = false)
-    {
-        if (current.WasPressed(GamepadButton.DPadLeft, previous))
-            cursor.Step(-SlotStepPx, 0, fw, fh);
-        if (current.WasPressed(GamepadButton.DPadRight, previous))
-            cursor.Step(+SlotStepPx, 0, fw, fh);
-        if (skipVertical) return;
-        if (current.WasPressed(GamepadButton.DPadUp, previous))
-            cursor.Step(0, -SlotStepPx, fw, fh);
-        if (current.WasPressed(GamepadButton.DPadDown, previous))
-            cursor.Step(0, +SlotStepPx, fw, fh);
     }
 
     private bool AnyModalDialogOpen()

@@ -109,7 +109,7 @@ internal static class Program
                     Console.WriteLine(
                         "gpclab — banco de pruebas offline de GamepadCompanion\n\n" +
                         "  apicheck [--update]   compara las firmas del engine de las que dependen los\n" +
-                        "                        glifos contra tools/gpclab/apisurface.baseline.txt\n" +
+                        "                        glifos y el cursor contra tools/gpclab/apisurface.baseline.txt\n" +
                         "  selftest              pruebas de regresión del mod que no necesitan el juego\n" +
                         "  labels                la tabla (control, familia) → etiqueta, con anchos\n" +
                         "  boxes                 mide las 3 cajas de ícono del cartel × GUIScale\n" +

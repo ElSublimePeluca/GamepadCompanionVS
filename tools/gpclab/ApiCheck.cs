@@ -8,7 +8,7 @@ using System.Text;
 namespace GamepadCompanion.Lab;
 
 // Vuelca por reflection la superficie de API del engine de la que dependen los glifos del
-// issue #8 y la diffea contra un baseline commiteado.
+// issue #8 y los destinos del cursor del issue #9, y la diffea contra un baseline commiteado.
 //
 // Para qué: el día que Vintage Story se actualiza, esto contesta en dos segundos si algún
 // seam cambió — antes de abrir el IDE, y no tres semanas después por un issue de alguien.
@@ -57,7 +57,8 @@ internal static class ApiCheck
             { "WhiteMediumText", "WhiteSmallText", "WithFontSize", "WithStroke", "WithColor",
               "GetTextExtents", "GetFontExtents", "UnscaledFontsize", "SetupContext", "Clone" }),
         ("Vintagestory.API.Client.TextDrawUtil", new[] { "DrawTextLine" }),
-        ("Vintagestory.API.Client.GuiElement", new[] { "scaled", "RoundRectangle" }),
+        ("Vintagestory.API.Client.GuiElement", new[]
+            { "scaled", "RoundRectangle", "Bounds", "InsideClipBounds" }),
         ("Vintagestory.API.Client.GuiStyle", new[]
             { "StandardFontName", "NormalFontSize", "SmallishFontSize", "SmallFontSize",
               "DialogDefaultTextColor", "DarkBrownColor" }),
@@ -66,13 +67,32 @@ internal static class ApiCheck
         // --- Invalidación
         ("Vintagestory.Client.NoObf.GuiComposerManager", new[]
             { "MarkAllDialogsForRecompose", "RecomposeAllDialogs" }),
-        ("Vintagestory.Client.NoObf.ClientMain", new[] { "GuiComposers" }),
+        ("Vintagestory.Client.NoObf.ClientMain", new[]
+            { "GuiComposers", "MouseCurrentX", "MouseCurrentY" }),
         ("Vintagestory.Client.NoObf.ClientSettings", new[]
             { "Inst", "AddKeyCombinationUpdatedWatcher", "ClearWatchers" }),
         ("Vintagestory.API.Client.IClientEventAPI", new[] { "HotkeysChanged" }),
         ("Vintagestory.API.Client.IInputAPI", new[] { "GetHotKeyByCode", "HotKeys" }),
         ("Vintagestory.API.Client.GuiElementItemstackInfo", new[]
             { "curSlot", "SetSourceSlot" }),
+
+        // --- Cursor virtual: de dónde salen los destinos del D-pad (issue #9). Los privados
+        //     e internal los lee CursorTargets por reflection, y si desaparecen ese tipo de
+        //     destino se apaga en silencio: es acá donde tiene que saltar.
+        ("Vintagestory.API.Client.GuiComposer", new[] { "interactiveElements", "Enabled" }),
+        ("Vintagestory.API.Client.GuiDialog", new[]
+            { "Composers", "DialogType", "IsOpened", "ShouldReceiveMouseEvents" }),
+        ("Vintagestory.API.Client.GuiDialog+DlgComposers", new[] { "Values" }),
+        ("Vintagestory.API.Client.GuiElementItemSlotGridBase", new[]
+            { "SlotBounds", "unscaledSlotPadding" }),
+        ("Vintagestory.API.Client.GuiElementPassiveItemSlot", new[] { "unscaledSlotSize" }),
+        ("Vintagestory.API.Client.GuiElementSkillItemGrid", new[] { "skillItems" }),
+        ("Vintagestory.API.Client.GuiElementHorizontalTabs", new[]
+            { "tabs", "tabWidths", "currentScrollOffset", "unscaledTabSpacing" }),
+        ("Vintagestory.API.Client.GuiElementControl", new[] { "Enabled" }),
+        ("Vintagestory.API.Client.ElementBounds", new[]
+            { "absX", "absY", "OuterWidth", "OuterHeight", "InnerWidth", "InnerHeight",
+              "fixedWidth", "fixedHeight", "ParentBounds", "PointInside" }),
     };
 
     public static int Run(string gameRoot, string[] args)
@@ -118,14 +138,15 @@ internal static class ApiCheck
         foreach (string l in removed) Console.WriteLine("  - " + l);
         foreach (string l in added)   Console.WriteLine("  + " + l);
         Console.WriteLine(
-            "\n  Revisá qué canal de glifos toca cada cambio, ajustá GlyphPatcher si hace falta,\n" +
-            "  y actualizá el baseline en el MISMO commit:\n" +
+            "\n  Revisá qué toca cada cambio (un canal de glifos en GlyphPatcher, o un tipo de\n" +
+            "  destino del D-pad en CursorTargets), ajustá el código si hace falta, y actualizá\n" +
+            "  el baseline en el MISMO commit:\n" +
             "      dotnet run --project tools/gpclab -- apicheck --update");
         return 1;
     }
 
     private static string Header(Assembly api, Assembly lib) =>
-        "# gpclab apicheck — superficie de API del engine de la que dependen los glifos.\n" +
+        "# gpclab apicheck — superficie de API del engine de la que dependen los glifos y el cursor.\n" +
         "# Generado con `dotnet run --project tools/gpclab -- apicheck --update`. No editar a mano.\n" +
         $"# Tomado contra VintagestoryAPI {api.GetName().Version} / VintagestoryLib {lib.GetName().Version}.\n" +
         "# La versión del juego NO va en las líneas comparadas a propósito: un update que no\n" +

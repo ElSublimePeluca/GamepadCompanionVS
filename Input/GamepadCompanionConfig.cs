@@ -55,7 +55,7 @@ public sealed class GamepadCompanionConfig
     // Override de la acción edge-press de un botón. Key = nombre del
     // GamepadButton (A, B, DPadLeft, etc.). Una entry presente reemplaza
     // el default hardcoded de ButtonMapper para ese botón. null/ausente
-    // = usar el default. LB y RB no son configurables (radial / cursor).
+    // = usar el default. LB (radial) y RB no son configurables, ver ButtonBindings.
     public Dictionary<string, SlotConfig?>? ButtonBindings { get; set; } = null;
 }
 

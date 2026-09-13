@@ -10,7 +10,9 @@ namespace GamepadCompanion.Actions;
 //
 // Botones excluidos a propósito:
 //   - LB: abre el radial.
-//   - RB: activa el modo cursor virtual.
+//   - RB: mantenido, hacía que el stick moviera el cursor virtual. Desde el
+//     issue #9 el stick lo mueve solo y RB no hace nada; queda afuera hasta
+//     decidir si pasa a ser asignable.
 //   - L3/R3: ToggleManager los usa incondicionalmente para Ctrl/Shift
 //     toggle; exponer override sería engañoso porque la binding del
 //     usuario se sumaría al toggle de Ctrl/Shift en vez de reemplazarlo.
@@ -23,7 +25,7 @@ public sealed class ButtonBindings
     // el default actual; queda sincronizado con ButtonMapper.
     public static readonly GamepadButton[] Configurable =
     {
-        GamepadButton.A,           // jump (siempre activo) + acción extra
+        GamepadButton.A,           // jump (siempre activo) + acción extra; sin binding, clic en diálogos
         GamepadButton.B,           // default: dismiss dialog o drop item
         GamepadButton.X,           // default: toolmodeselect
         GamepadButton.Y,           // default: inventorydialog

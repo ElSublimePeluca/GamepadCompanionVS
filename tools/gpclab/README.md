@@ -34,9 +34,9 @@ dotnet run --project tools/gpclab -- render [salida.png]
 ### `apicheck`
 
 Vuelca por reflection las firmas del engine de las que dependen los glifos (los seams de
-Harmony, los campos que se leen, los valores de los que salen las cuentas de píxeles) y las
-compara contra `apisurface.baseline.txt`, que está commiteado. Sale con código ≠ 0 si algo
-cambió.
+Harmony, los campos que se leen, los valores de los que salen las cuentas de píxeles) y el
+cursor virtual (los privados de los que salen los destinos del D-pad), y las compara contra
+`apisurface.baseline.txt`, que está commiteado. Sale con código ≠ 0 si algo cambió.
 
 **Correlo el día que actualizás el juego, antes de abrir el IDE.** Si algo cambió, es un
 error el día correcto en vez de un issue de un usuario tres semanas después. Cuando el
@@ -52,8 +52,8 @@ el cuerpo de un método cambie sin cambiar la firma.
 
 ### `selftest`
 
-Pruebas de regresión del propio mod que no necesitan el juego abierto. Hoy cubren los dos
-caminos que nadie ejercita a mano y que ya costaron bugs reales:
+Pruebas de regresión del propio mod que no necesitan el juego abierto. Cubren caminos que
+nadie ejercita a mano y que ya costaron bugs reales:
 
 - **Round-trip de bindings a JSON.** El switch de serialización estaba duplicado en
   `SlotBindings` y en `ButtonBindings`; la copia de la rueda nunca aprendió `"holdkey"`, así
@@ -62,6 +62,13 @@ caminos que nadie ejercita a mano y que ya costaron bugs reales:
 - **Recuperación de una config corrupta.** Sólo corre cuando el JSON ya está roto — o sea
   nunca durante el desarrollo — y si falla, el `ModLoader` saca al mod de `enabledSystems` y
   el gamepad entero queda muerto con un renglón en el log.
+- **A dónde salta el D-pad con un diálogo abierto** (issue #9). Con la geometría medida en la
+  captura del reporte: la salida del crafteo que el paso fijo de 52 px no alcanzaba, el cruce
+  entre la grilla y el inventario, el cono que evita saltar a la mochila 600 px más abajo, un
+  campo de texto ancho y la fila del selector de recetas. Lo que no se prueba acá es de qué
+  elementos salen los destinos (`CursorTargets`): eso necesita diálogos compuestos de verdad.
+- **A y RT son un mismo clic en los diálogos.** Apretarlos en cualquier orden tiene que dar un
+  solo MouseDown y un solo MouseUp, y con un binding en A sólo clickea RT.
 
 Sale con código ≠ 0 si algo falla. Corre en la laptop, sin el juego instalado.
 

@@ -11,7 +11,7 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 - **Movimiento y cámara** con sticks. Sensibilidad horizontal/vertical configurable, dead zone ajustable, opción de invertir pitch.
 - **Acciones contextuales**: B cierra el dialog abierto o suelta el item activo según contexto; A salta (siempre); X/Y/Back/Start mapeados a tool mode, inventario, mapa, menú.
 - **Rueda radial** de 12 slots configurables (LB + stick derecho). Defaults para Personaje, Chat, Manual, Configurar, Teclado virtual; el resto se asigna desde el dialog.
-- **Cursor virtual sobre GUIs**: cuando hay un dialog modal abierto aparece un cursor amarillo. Con RB el stick lo mueve continuo; sin RB el DPad lo salta por pasos del tamaño de un slot — pensado para navegar inventarios rápido. RT/LT clickean (izquierdo/derecho).
+- **Cursor virtual sobre GUIs**: cuando hay un dialog modal abierto aparece un cursor amarillo. El stick derecho lo mueve libre, como un mouse; el DPad lo hace saltar al slot, receta, pestaña o botón más cercano en esa dirección — pensado para navegar inventarios rápido. RT o A hacen clic izquierdo y LT clic derecho.
 - **Toggles de agacharse y correr** con L3/R3, indicador en HUD esquina superior derecha (si el minimapa está pinneado ahí, el indicador se acomoda justo debajo). Son las teclas Shift y Ctrl del juego, así que además de agacharse y correr sirven de modificador para los clicks: shift+click en inventario, ctrl+click para colocar, etc.
 - **Modo precisión** con DPad ↑: divide la sensibilidad de cámara por una fracción (default 0.3x) para apuntar bloques específicos.
 - **Acciones compuestas**: una sola slot del radial puede ejecutar varias acciones en secuencia.
@@ -104,7 +104,7 @@ Si tu controller solo aparece como gamepad cuando Steam Input lo emula (típico 
 | X         | Tool mode |
 | Y         | Inventario |
 | LB (hold) | Abrir radial menu |
-| RB (hold) | Cursor virtual modo smooth |
+| RB        | Sin asignar |
 | RT        | Click izquierdo / atacar / minar |
 | LT        | Click derecho / interactuar / colocar |
 | Back      | Mapa |
@@ -113,7 +113,14 @@ Si tu controller solo aparece como gamepad cuando Steam Input lo emula (típico 
 | R3        | Toggle agacharse (Shift) |
 | DPad ↑    | Toggle modo precisión |
 | DPad ↓    | Press G (sentarse) |
-| DPad ←/→  | Cambiar slot del hotbar (o navegar slots en cursor mode) |
+| DPad ←/→  | Cambiar slot del hotbar |
+
+Con un dialog abierto aparece el cursor virtual y cambian dos cosas: el **stick derecho** mueve el
+cursor libre, como un mouse, y el **DPad** deja de hacer lo de la tabla y salta al slot, receta,
+pestaña o botón más cercano en esa dirección. RT o A hacen clic izquierdo donde está el cursor (son
+el mismo botón, así que apretar los dos no da dos clics) y LT hace clic derecho. Si le asignaste
+algo a A desde `.gpconfig`, A hace eso y el clic queda en RT. En el mapa a pantalla completa, DPad
+↑/↓ hacen zoom.
 
 Todo configurable desde `.gpconfig`.
 

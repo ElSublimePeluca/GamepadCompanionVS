@@ -1,4 +1,4 @@
-# gpclab apicheck — superficie de API del engine de la que dependen los glifos.
+# gpclab apicheck — superficie de API del engine de la que dependen los glifos y el cursor.
 # Generado con `dotnet run --project tools/gpclab -- apicheck --update`. No editar a mano.
 # Tomado contra VintagestoryAPI 1.22.7.0 / VintagestoryLib 1.22.7.0.
 # La versión del juego NO va en las líneas comparadas a propósito: un update que no
@@ -18,10 +18,40 @@ Vintagestory.API.Client.CairoFont :: METHOD public TextExtents GetTextExtents(St
 Vintagestory.API.Client.CairoFont :: METHOD public Void SetupContext(Context ctx)  [decl:CairoFont]
 Vintagestory.API.Client.CairoFont :: METHOD public static CairoFont WhiteMediumText()  [decl:CairoFont]
 Vintagestory.API.Client.CairoFont :: METHOD public static CairoFont WhiteSmallText()  [decl:CairoFont]
+Vintagestory.API.Client.ElementBounds :: FIELD  public Double fixedHeight
+Vintagestory.API.Client.ElementBounds :: FIELD  public Double fixedWidth
+Vintagestory.API.Client.ElementBounds :: FIELD  public ElementBounds ParentBounds
+Vintagestory.API.Client.ElementBounds :: METHOD public Boolean PointInside(Double absPointX, Double absPointY)  [decl:ElementBounds]
+Vintagestory.API.Client.ElementBounds :: METHOD public Boolean PointInside(Int32 absPointX, Int32 absPointY)  [decl:ElementBounds]
+Vintagestory.API.Client.ElementBounds :: PROP   Double InnerHeight { public get; }
+Vintagestory.API.Client.ElementBounds :: PROP   Double InnerWidth { public get; }
+Vintagestory.API.Client.ElementBounds :: PROP   Double OuterHeight { public get; }
+Vintagestory.API.Client.ElementBounds :: PROP   Double OuterWidth { public get; }
+Vintagestory.API.Client.ElementBounds :: PROP   Double absX { public get; }
+Vintagestory.API.Client.ElementBounds :: PROP   Double absY { public get; }
+Vintagestory.API.Client.GuiComposer :: FIELD  internal Dictionary<String,GuiElement> interactiveElements
+Vintagestory.API.Client.GuiComposer :: FIELD  public Boolean Enabled
+Vintagestory.API.Client.GuiDialog :: FIELD  public DlgComposers Composers
+Vintagestory.API.Client.GuiDialog :: METHOD public virtual Boolean IsOpened()  [decl:GuiDialog]
+Vintagestory.API.Client.GuiDialog :: METHOD public virtual Boolean IsOpened(String dialogComposerName)  [decl:GuiDialog]
+Vintagestory.API.Client.GuiDialog :: METHOD public virtual Boolean ShouldReceiveMouseEvents()  [decl:GuiDialog]
+Vintagestory.API.Client.GuiDialog :: PROP   EnumDialogType DialogType { public get; }
+Vintagestory.API.Client.GuiDialog+DlgComposers :: PROP   IEnumerable<GuiComposer> Values { public get; }
+Vintagestory.API.Client.GuiElement :: FIELD  public ElementBounds Bounds
 Vintagestory.API.Client.GuiElement :: METHOD public static Double scaled(Double value)  [decl:GuiElement]
 Vintagestory.API.Client.GuiElement :: METHOD public static Void RoundRectangle(Context ctx, Double x, Double y, Double width, Double height, Double radius)  [decl:GuiElement]
+Vintagestory.API.Client.GuiElement :: PROP   ElementBounds InsideClipBounds { public get; public set; }
+Vintagestory.API.Client.GuiElementControl :: PROP   Boolean Enabled { public get; public set; }
+Vintagestory.API.Client.GuiElementHorizontalTabs :: FIELD  private Double currentScrollOffset
+Vintagestory.API.Client.GuiElementHorizontalTabs :: FIELD  private Int32[] tabWidths
+Vintagestory.API.Client.GuiElementHorizontalTabs :: FIELD  public Double unscaledTabSpacing
+Vintagestory.API.Client.GuiElementHorizontalTabs :: FIELD  public GuiTab[] tabs
+Vintagestory.API.Client.GuiElementItemSlotGridBase :: FIELD  public ElementBounds[] SlotBounds
+Vintagestory.API.Client.GuiElementItemSlotGridBase :: FIELD  public static Double unscaledSlotPadding
 Vintagestory.API.Client.GuiElementItemstackInfo :: FIELD  public ItemSlot curSlot
 Vintagestory.API.Client.GuiElementItemstackInfo :: METHOD public Boolean SetSourceSlot(ItemSlot nowSlot, Boolean forceRecompose = False)  [decl:GuiElementItemstackInfo]
+Vintagestory.API.Client.GuiElementPassiveItemSlot :: FIELD  public static Double unscaledSlotSize
+Vintagestory.API.Client.GuiElementSkillItemGrid :: FIELD  private List<SkillItem> skillItems
 Vintagestory.API.Client.GuiStyle :: FIELD  public static Double NormalFontSize
 Vintagestory.API.Client.GuiStyle :: FIELD  public static Double SmallFontSize
 Vintagestory.API.Client.GuiStyle :: FIELD  public static Double SmallishFontSize
@@ -66,6 +96,8 @@ Vintagestory.API.Client.WorldInteraction :: FIELD  public String HotKeyCode
 Vintagestory.API.Client.WorldInteraction :: PROP   String[] HotKeyCodes { public get; public set; }
 Vintagestory.API.Config.RuntimeEnv :: FIELD  public static Single GUIScale
 Vintagestory.Client.NoObf.ClientMain :: FIELD  public GuiComposerManager GuiComposers
+Vintagestory.Client.NoObf.ClientMain :: FIELD  public Int32 MouseCurrentX
+Vintagestory.Client.NoObf.ClientMain :: FIELD  public Int32 MouseCurrentY
 Vintagestory.Client.NoObf.ClientSettings :: FIELD  public static ClientSettings Inst
 Vintagestory.Client.NoObf.ClientSettings :: METHOD public Void AddKeyCombinationUpdatedWatcher(Action<String,KeyCombination> handler)  [decl:ClientSettings]
 Vintagestory.Client.NoObf.ClientSettings :: METHOD public virtual Void ClearWatchers()  [decl:ClientSettings]

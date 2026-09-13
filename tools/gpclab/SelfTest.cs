@@ -36,6 +36,8 @@ internal static class SelfTest
         RoundTrip();
         CorruptConfig();
         failures += GlyphTests.Run();
+        failures += CursorNavTests.Run();
+        failures += CursorClickTests.Run();
         Console.WriteLine(failures == 0
             ? "\n  todo OK"
             : $"\n  {failures} fallaron");

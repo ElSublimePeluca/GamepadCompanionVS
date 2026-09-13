@@ -13,8 +13,8 @@ namespace GamepadCompanion.Input;
 // frame, lo que "clavaba" el mouse real — el usuario no podía soltar el control
 // y tirar la mano al mouse (reportado por ElSublimePeluca). Ahora:
 //   - Solo escribimos al OS en frames donde el gamepad efectivamente movió el
-//     cursor (stick con RB, o step de DPad). En frames idle no tocamos el mouse,
-//     así el mouse físico queda libre.
+//     cursor (stick derecho, o salto del D-pad). En frames idle no tocamos el
+//     mouse, así el mouse físico queda libre.
 //   - Si detectamos que el cursor del OS se movió sin que lo movamos nosotros
 //     (el usuario agarró el mouse), entramos en PhysicalOverride: escondemos el
 //     cursor amarillo y dejamos de sincronizar hasta que el gamepad vuelva a
@@ -27,7 +27,14 @@ public sealed class VirtualCursor
     // Velocidad máxima del cursor a stick a tope (px/seg). Suficiente para
     // cruzar una pantalla 1080p en ~0.9s.
     private const float MaxSpeed = 1200f;
-    private const float DeadZone = 0.15f;
+
+    // Inclinación mínima del stick para quitarle el control al mouse físico.
+    // Desde el issue #9 el stick mueve el cursor sin mantener RB, así que un mando
+    // con deriva apoyado en el escritorio pelearía con el mouse mientras haya un
+    // diálogo abierto. Pasar la zona muerta alcanza para mover un cursor que ya es
+    // del gamepad; para arrebatárselo al mouse hace falta una inclinación que no
+    // pueda ser deriva.
+    private const float ReclaimDeflection = 0.5f;
 
     // Umbral (px) de desplazamiento del cursor del OS que NO causamos nosotros
     // para considerar que el usuario agarró el mouse físico. 3px filtra el
@@ -56,11 +63,11 @@ public sealed class VirtualCursor
         this.capi = capi;
     }
 
-    // Llama al activarse el cursor. Si ya estaba visible no reinicia, así si el
-    // usuario suelta y vuelve a presionar RB en sucesión corta no pierde la
-    // posición. Al mostrarse arranca donde está el mouse físico (no en el
-    // centro) y establece ese punto como baseline: así no hay salto al abrir el
-    // dialog y la detección de mouse físico tiene una referencia inmediata.
+    // Se llama en cada frame con un diálogo abierto y sólo inicializa la primera
+    // vez: la posición sobrevive mientras quede algún diálogo. Al mostrarse
+    // arranca donde está el mouse físico (no en el centro) y establece ese punto
+    // como baseline: así no hay salto al abrir el dialog y la detección de mouse
+    // físico tiene una referencia inmediata.
     public unsafe void Show(int frameW, int frameH)
     {
         if (Visible) return;
@@ -93,22 +100,31 @@ public sealed class VirtualCursor
         haveSynced = false;
     }
 
-    public unsafe void Update(float stickX, float stickY, float dt,
+    // Stick derecho → movimiento libre. Devuelve true si movió el cursor, y en ese
+    // caso ya sincronizó el mouse del OS. La zona muerta es la del config: quien
+    // tiene deriva ya la subió para la cámara, y ahora el stick está vivo en todos
+    // los diálogos.
+    public unsafe bool Update(float stickX, float stickY, float deadZone, float dt,
                               int frameW, int frameH)
     {
-        if (!Visible) return;
+        if (!Visible) return false;
 
         var window = GLFW.GetCurrentContext();
         // Sin foco no tocamos el mouse del OS (fix alt-tab): antes seguíamos
         // snapeando el mouse a VS aunque estuviera en segundo plano.
-        if (!IsFocused(window)) return;
+        if (!IsFocused(window)) return false;
+
+        // Un config editado a mano con 1.0 dividiría por cero en la curva.
+        deadZone = Math.Clamp(deadZone, 0f, 0.9f);
 
         // Curva cuadrática suave: precisión cerca del centro, velocidad cerca
         // del borde. Sign(s)*s² conserva dirección.
-        float ax = ApplyDeadZone(stickX);
-        float ay = ApplyDeadZone(stickY);
+        float ax = ApplyDeadZone(stickX, deadZone);
+        float ay = ApplyDeadZone(stickY, deadZone);
+        bool deliberate = !PhysicalOverride
+            || stickX * stickX + stickY * stickY >= ReclaimDeflection * ReclaimDeflection;
 
-        if (ax != 0f || ay != 0f)
+        if ((ax != 0f || ay != 0f) && deliberate)
         {
             // El gamepad pide el control: si veníamos cediéndoselo al mouse
             // físico, re-anclamos donde está el mouse para no saltar.
@@ -119,34 +135,51 @@ public sealed class VirtualCursor
             // Y invertido: stick arriba (+Y) sube en pantalla (-Y).
             Y = Math.Clamp(Y - ay * MaxSpeed * dt, 0, frameH);
             SyncOsCursor(window);
+            return true;
         }
-        else if (PhysicalMoved(window))
-        {
-            // Stick quieto y el mouse del OS se movió por su cuenta → el usuario
-            // agarró el mouse. Cedemos.
-            PhysicalOverride = true;
-        }
+
+        // Stick quieto y el mouse del OS se movió por su cuenta → el usuario
+        // agarró el mouse. Cedemos.
+        if (PhysicalMoved(window)) PhysicalOverride = true;
+        return false;
     }
 
-    // Salto discreto en pixels (DPad navega slot-por-slot del inventario sin
-    // arrastrar con el stick). Es input de gamepad, así que toma el control.
-    public unsafe void Step(int dx, int dy, int frameW, int frameH)
+    // El D-pad es input de gamepad, así que toma el control antes de decidir
+    // nada: si el usuario venía con el mouse físico, la búsqueda del destino
+    // tiene que arrancar donde está el mouse y no donde quedó el cursor amarillo.
+    // Devuelve false si no hay cursor o la ventana no tiene foco.
+    public unsafe bool TryTakeControl(int frameW, int frameH)
     {
-        if (!Visible) return;
+        if (!Visible) return false;
 
         var window = GLFW.GetCurrentContext();
-        if (!IsFocused(window)) return;
+        if (!IsFocused(window)) return false;
 
         if (PhysicalOverride) ReanchorToOsCursor(window, frameW, frameH);
         PhysicalOverride = false;
-
-        X = Math.Clamp(X + dx, 0, frameW);
-        Y = Math.Clamp(Y + dy, 0, frameH);
-        SyncOsCursor(window);
+        return true;
     }
 
-    // Re-sincroniza la posición OS/ClientMain sin mover el cursor. En modo step
-    // (DPad) entre pasos el cursor.X/Y no cambia pero algunos widgets (HudDropItem
+    // Salto absoluto: el centro del destino que eligió CursorNavigation. Va
+    // después de TryTakeControl, que es quien chequea foco y visibilidad.
+    public unsafe void MoveTo(float x, float y, int frameW, int frameH)
+    {
+        X = Math.Clamp(x, 0, frameW);
+        Y = Math.Clamp(y, 0, frameH);
+        SyncOsCursor(GLFW.GetCurrentContext());
+    }
+
+    // Salto relativo en pixels: lo que queda del paso fijo del D-pad, para cuando
+    // no hay destinos que reconocer (el mapa, la GUI de algún mod).
+    public bool Step(int dx, int dy, int frameW, int frameH)
+    {
+        if (!TryTakeControl(frameW, frameH)) return false;
+        MoveTo(X + dx, Y + dy, frameW, frameH);
+        return true;
+    }
+
+    // Re-sincroniza la posición OS/ClientMain sin mover el cursor. En frames sin
+    // movimiento el cursor.X/Y no cambia pero algunos widgets (HudDropItem
     // para el item arrastrado, etc) leen estado que sólo se refresca via GLFW
     // callback y sin un SetCursorPos por frame puede driftear. Pero si el usuario
     // está usando el mouse físico (PhysicalOverride o movimiento detectado) NO
@@ -167,8 +200,8 @@ public sealed class VirtualCursor
     // Sincroniza la posición del mouse a varios niveles para que los widgets que
     // la leen por distintas vías encuentren el cursor virtual:
     //
-    //  - GLFW.SetCursorPos: mueve el cursor del OS, así si el usuario suelta RB
-    //    el mouse físico queda donde estaba el virtual.
+    //  - GLFW.SetCursorPos: mueve el cursor del OS, así si el usuario agarra el
+    //    mouse físico lo encuentra donde estaba el virtual.
     //  - ClientMain.MouseCurrentX/Y: campos públicos que `capi.Input.MouseX/Y`
     //    exponen. Algunos widgets (GuiElementSkillItemGrid, usado por el recipe
     //    selector del knapping/anvil/tool-mode) los leen directo en
@@ -206,23 +239,30 @@ public sealed class VirtualCursor
     // Mueve el cursor virtual a donde está el mouse físico ahora. Se llama al
     // retomar el control tras un PhysicalOverride para que el cursor amarillo
     // aparezca bajo la mano del usuario, sin saltar a su posición previa.
+    //
+    // También mueve la referencia de PhysicalMoved. Sin eso, un D-pad que retoma
+    // el control pero no encuentra destino dejaba la referencia vieja, y el Sync
+    // del mismo frame volvía a ver "el mouse se movió" y devolvía el control.
     private unsafe void ReanchorToOsCursor(Window* window, int frameW, int frameH)
     {
         if (window == null) return;
         GLFW.GetCursorPos(window, out double cx, out double cy);
         X = (float)Math.Clamp(cx, 0, frameW);
         Y = (float)Math.Clamp(cy, 0, frameH);
+        lastSyncX = cx;
+        lastSyncY = cy;
+        haveSynced = true;
     }
 
     private static unsafe bool IsFocused(Window* window)
         => window == null
            || GLFW.GetWindowAttrib(window, WindowAttributeGetBool.Focused);
 
-    private static float ApplyDeadZone(float v)
+    private static float ApplyDeadZone(float v, float deadZone)
     {
         float abs = MathF.Abs(v);
-        if (abs < DeadZone) return 0f;
-        float scaled = (abs - DeadZone) / (1f - DeadZone);
+        if (abs < deadZone) return 0f;
+        float scaled = (abs - deadZone) / (1f - deadZone);
         return MathF.Sign(v) * scaled * scaled;
     }
 }
