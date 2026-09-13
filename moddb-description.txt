@@ -1,5 +1,5 @@
 GamepadCompanion — descripción para la página de ModDB
-(en inglés, como la original; parte de la descripción anterior con lo de 1.13.0
+(en inglés, como la original; parte de la descripción anterior con lo de 1.13.1
 integrado. Los cambios respecto de la versión previa están listados al final de
 este archivo, después de la línea de corte, para que puedas revisarlos — esa
 parte NO va a la página.)
@@ -69,7 +69,7 @@ This mod is essentially an alternative to Steam Input *specific to VS*, with kno
 
 ## How it works internally (disclaimer)
 
-To make vanilla GUIs react to the gamepad without per-dialog patches, the mod injects synthetic mouse and keyboard events into the VS engine: it writes `ClientMain.MouseCurrentX/Y`, calls `OnMouseDown` / `OnKeyDown` / `OnKeyPress` directly, and writes Ctrl/Shift state into `KeyboardState[]`.
+To make vanilla GUIs react to the gamepad without per-dialog patches, the mod injects synthetic mouse and keyboard events into the VS engine: it writes `ClientMain.MouseCurrentX/Y`, calls `OnMouseDown` / `OnKeyDown` / `OnKeyPress` directly, and writes Ctrl/Shift state into `KeyboardState[]`. Menus drawn with ImGui read clicks from the game window's own mouse state instead, so for those it also sets that state's buttons.
 
 Since 1.12.0 it also uses Harmony — the copy the game already ships — to patch four public methods so the key hints can name your buttons. The substitution only happens inside a window opened by those patches, which is why Settings > Controls, the conflict detector and the hotbar numbers are untouched by construction rather than by a list of exceptions. Each surface is a separate channel with its own breaker: if the game changes and one of them no longer applies, that surface goes back to keyboard hints and everything else keeps working. Nothing is ever unpatched, so reloading a world cannot stack patches.
 
@@ -84,10 +84,10 @@ The four PlayStation face symbols are drawn by the mod as vector shapes; no thir
 ================================================================================
 CAMBIOS RESPECTO DE LA DESCRIPCIÓN ANTERIOR (no va a la página)
 
-  1. El bullet del cursor virtual: el stick derecho ya no necesita RB, el DPad
-     salta al slot, receta, pestaña o botón más cercano en vez de moverse de a
-     un slot, y A clickea igual que RT. Es el único cambio de texto de la página.
-  2. Para revisar, sin tocar: el disclaimer dice "no `unsafe` blocks", pero el
-     mod usa `unsafe` desde la primera versión (los punteros de GLFW del cursor
-     y del lector del mando). Venía así de la descripción anterior; si querés,
-     se saca esa frase.
+  1. El disclaimer suma una frase: para los menús de ImGui el mod también escribe
+     los botones del estado de mouse de la ventana. Es el mismo párrafo que en la
+     1.12.0 sumó lo de Harmony; si preferís no mencionarlo, se saca esa frase y la
+     página queda igual que la de la 1.13.0. Es el único cambio de texto.
+  2. Sigue para revisar, sin tocar: el disclaimer dice "no `unsafe` blocks", pero
+     el mod usa `unsafe` desde la primera versión (los punteros de GLFW del cursor
+     y del lector del mando).

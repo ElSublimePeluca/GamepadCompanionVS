@@ -1,0 +1,24 @@
+GamepadCompanion v1.13.1
+
+Fixes
+
+- Menus drawn with ImGui now respond to the controller's clicks. Found with the
+  new skills menu of xSkills: the virtual cursor moved over it, but A, RT and LT
+  did nothing.
+
+  Those menus come from VSImGui, and ImGui does not listen to the game's mouse
+  events. It reads the mouse buttons straight from the game window's own state,
+  which only real mouse clicks change, so every click from the controller went
+  to the game's dialogs and never reached the menu. The cursor position did
+  reach it, so the menu could be pointed at, just not clicked. Clicks from the
+  virtual cursor are now reflected in that same window state while a menu is
+  open, and released as soon as the button is let go, the menu closes or the
+  game loses focus. A mouse button you are physically holding is never touched,
+  and the game itself does not read that state, so nothing else changes.
+
+- In a menu that has no slots or buttons of the game's own, like those ImGui
+  menus, the D-pad moves the cursor one step at a time again. Since 1.13.0 it
+  jumps to the nearest slot or button, but in such a menu the only thing it
+  could find was the hotbar at the bottom of the screen. Inventories, containers
+  and everything else built from the game's elements keep jumping from slot to
+  slot.
