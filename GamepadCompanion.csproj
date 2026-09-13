@@ -70,6 +70,12 @@
       <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.GraphicsLibraryFramework.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- La ventana del juego es un GameWindow de OpenTK: hace falta para leer su
+         MouseState, que es de donde ImGui toma los clicks (NativeMouseMirror). -->
+    <Reference Include="OpenTK.Windowing.Desktop">
+      <HintPath>$(VINTAGE_STORY)/Lib/OpenTK.Windowing.Desktop.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <!-- Harmony lo trae el juego. Private=false: NO se copia al output ni entra al
          deps.json, asi que el zip del release no cambia y no hay riesgo de cargar
          un segundo 0Harmony. El AssemblyResolver del juego resuelve por nombre

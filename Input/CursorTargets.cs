@@ -41,16 +41,22 @@ internal static class CursorTargets
     private static readonly FieldInfo? TabScroll =
         typeof(GuiElementHorizontalTabs).GetField("currentScrollOffset", AnyInstance);
 
-    public static void Collect(ICoreClientAPI capi, List<NavRect> into)
+    // Devuelve cuántos de los destinos salieron de diálogos y no de HUDs. Con cero,
+    // el diálogo abierto no tiene nada que el D-pad reconozca (un menú de ImGui,
+    // una GUI dibujada a mano) y los slots del hotbar no alcanzan para recorrerlo:
+    // CursorNavigator usa el paso fijo.
+    public static int Collect(ICoreClientAPI capi, List<NavRect> into)
     {
         into.Clear();
-        if (InteractiveElements is null) return;
+        if (InteractiveElements is null) return 0;
 
+        int fromDialogs = 0;
         foreach (GuiDialog dialog in capi.Gui.OpenedGuis)
         {
             if (dialog is null || !dialog.IsOpened() || !dialog.ShouldReceiveMouseEvents()) continue;
             if (dialog.Composers is null) continue;
             bool slotsOnly = dialog.DialogType != EnumDialogType.Dialog;
+            int before = into.Count;
 
             // Composers y no SingleComposer: hay diálogos con varios a la vez, y el
             // inventario cambia cuál tiene adentro según el modo de juego, así que
@@ -63,7 +69,10 @@ internal static class CursorTargets
                 foreach (GuiElement element in elements.Values)
                     Add(element, slotsOnly, into);
             }
+
+            if (!slotsOnly) fromDialogs += into.Count - before;
         }
+        return fromDialogs;
     }
 
     private static void Add(GuiElement element, bool slotsOnly, List<NavRect> into)

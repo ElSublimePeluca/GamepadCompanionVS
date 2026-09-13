@@ -6,6 +6,10 @@ namespace GamepadCompanion.Lab;
 // A y RT son el mismo click izquierdo del cursor virtual. Lo que se prueba es que
 // se comporten como UN botón: con dos botones separados, apretar A con RT ya
 // apretado mandaría un segundo MouseDown sin Up en el medio.
+//
+// Y la regla con la que ese click se refleja en los botones de OpenTK para los
+// menús de ImGui (NativeMouseMirror): ese estado no lo limpia nadie más, así que
+// soltar mal es un botón trabado para ImGui.
 internal static class CursorClickTests
 {
     private static int failures;
@@ -25,6 +29,16 @@ internal static class CursorClickTests
 
         Expect("con un binding en A, A no clickea", false, (0, 0), idle, a, idle);
         Expect("y RT sigue clickeando", false, (1, 1), idle, rt, idle);
+
+        Console.WriteLine("\n  botones de OpenTK para los menús de ImGui");
+        Check("con el clic apretado escribe true",
+              NativeMouseMirror.Decide(want: true, forced: false, physicalDown: false) == true);
+        Check("al soltar limpia lo que forzó",
+              NativeMouseMirror.Decide(want: false, forced: true, physicalDown: false) == false);
+        Check("al soltar no pisa un botón físico apretado",
+              NativeMouseMirror.Decide(want: false, forced: true, physicalDown: true) is null);
+        Check("sin nada propio no toca el estado de OpenTK",
+              NativeMouseMirror.Decide(want: false, forced: false, physicalDown: true) is null);
         return failures;
     }
 
@@ -44,6 +58,12 @@ internal static class CursorClickTests
         bool ok = (downs, ups) == expected;
         if (!ok) failures++;
         Console.WriteLine($"    [{(ok ? "ok" : "NO")}] {what}" + (ok ? "" : $"  → {downs} down, {ups} up"));
+    }
+
+    private static void Check(string what, bool ok)
+    {
+        if (!ok) failures++;
+        Console.WriteLine($"    [{(ok ? "ok" : "NO")}] {what}");
     }
 
     private static GamepadState Pad(bool a = false, float rt = 0f)

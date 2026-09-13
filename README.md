@@ -120,7 +120,8 @@ cursor libre, como un mouse, y el **DPad** deja de hacer lo de la tabla y salta 
 pestaña o botón más cercano en esa dirección. RT o A hacen clic izquierdo donde está el cursor (son
 el mismo botón, así que apretar los dos no da dos clics) y LT hace clic derecho. Si le asignaste
 algo a A desde `.gpconfig`, A hace eso y el clic queda en RT. En el mapa a pantalla completa, DPad
-↑/↓ hacen zoom.
+↑/↓ hacen zoom. En los menús que no tienen slots ni botones del juego, como los hechos con ImGui (el
+de xSkills), el DPad mueve el cursor de a un paso y los clics también les llegan.
 
 Todo configurable desde `.gpconfig`.
 

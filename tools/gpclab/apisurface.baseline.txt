@@ -3,6 +3,8 @@
 # Tomado contra VintagestoryAPI 1.22.7.0 / VintagestoryLib 1.22.7.0.
 # La versión del juego NO va en las líneas comparadas a propósito: un update que no
 # toca ninguna firma tiene que pasar sin ruido, o el chequeo se vuelve costumbre.
+OpenTK.Windowing.Desktop.NativeWindow :: PROP   MouseState MouseState { public get; }
+OpenTK.Windowing.GraphicsLibraryFramework.MouseState :: FIELD  private readonly BitArray _buttons
 VALUE  DrawWorldInteractionUtil (defaults del cartel) = UnscaledLineHeight=30 FontSize=20
 VALUE  GuiStyle.NormalFontSize = 30
 VALUE  GuiStyle.SmallFontSize = 16
@@ -98,6 +100,7 @@ Vintagestory.API.Config.RuntimeEnv :: FIELD  public static Single GUIScale
 Vintagestory.Client.NoObf.ClientMain :: FIELD  public GuiComposerManager GuiComposers
 Vintagestory.Client.NoObf.ClientMain :: FIELD  public Int32 MouseCurrentX
 Vintagestory.Client.NoObf.ClientMain :: FIELD  public Int32 MouseCurrentY
+Vintagestory.Client.NoObf.ClientPlatformWindows :: FIELD  public GameWindowNative window
 Vintagestory.Client.NoObf.ClientSettings :: FIELD  public static ClientSettings Inst
 Vintagestory.Client.NoObf.ClientSettings :: METHOD public Void AddKeyCombinationUpdatedWatcher(Action<String,KeyCombination> handler)  [decl:ClientSettings]
 Vintagestory.Client.NoObf.ClientSettings :: METHOD public virtual Void ClearWatchers()  [decl:ClientSettings]
@@ -108,3 +111,4 @@ Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: METHOD public Void Compose
 Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: METHOD public Void drawHelp(Context ctx, ImageSurface surface, ElementBounds currentBounds, ItemStack[] stacks, Double lineheight, WorldInteraction wi)  [decl:DrawWorldInteractionUtil]
 Vintagestory.Client.NoObf.GuiComposerManager :: METHOD public Void MarkAllDialogsForRecompose()  [decl:GuiComposerManager]
 Vintagestory.Client.NoObf.GuiComposerManager :: METHOD public Void RecomposeAllDialogs()  [decl:GuiComposerManager]
+Vintagestory.Client.ScreenManager :: FIELD  public static ClientPlatformAbstract Platform

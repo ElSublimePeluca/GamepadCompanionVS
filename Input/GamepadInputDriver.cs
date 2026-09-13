@@ -55,17 +55,20 @@ public sealed class GamepadInputDriver
 
     // El tick real está en OnTickCore. Este wrapper existe por una sola razón:
     // la proyección del estado sintético (ClientMain.KeyboardState de los
-    // toggles y los estáticos de ScreenManager) tiene que correr en TODOS los
-    // caminos, no en el camino feliz. Antes había cuatro `return` (gamepad
-    // desconectado, sin foco, radial, teclado virtual) por encima de
-    // toggles.OnTick, y encima ClientEventManager.TriggerRenderStage no tiene
-    // try/catch: una excepción de un handler de otro mod, disparada desde
-    // adentro de nuestro click sintético, se lleva puesto el resto del tick.
-    // Con el commit en un `finally`, todo eso pasa de "estado latcheado" a
-    // "se corrige en el frame siguiente".
+    // toggles, los estáticos de ScreenManager y los botones de OpenTK que lee
+    // ImGui) tiene que correr en TODOS los caminos, no en el camino feliz.
+    // Antes había cuatro `return` (gamepad desconectado, sin foco, radial,
+    // teclado virtual) por encima de toggles.OnTick, y encima
+    // ClientEventManager.TriggerRenderStage no tiene try/catch: una excepción
+    // de un handler de otro mod, disparada desde adentro de nuestro click
+    // sintético, se lleva puesto el resto del tick. Con el commit en un
+    // `finally`, todo eso pasa de "estado latcheado" a "se corrige en el
+    // frame siguiente".
     public void OnTick(GamepadState current, GamepadState previous, float dt)
     {
         bool injecting = current.IsConnected && IsWindowFocused();
+        // Lo vuelve a prender CursorClickMapper.Apply si hay cursor este tick.
+        cursorClicks.ClearHeld();
         try
         {
             OnTickCore(current, previous, dt, injecting);
@@ -75,6 +78,8 @@ public sealed class GamepadInputDriver
             toggles.ProjectKeyboardState(injecting);
             triggers.ProjectMouseKeyCodes(injecting);
             ScreenInputMirror.Commit(toggles, triggers, buttons, injecting);
+            NativeMouseMirror.Commit(injecting && cursorClicks.LeftHeld,
+                                     injecting && cursorClicks.RightHeld);
         }
     }
 

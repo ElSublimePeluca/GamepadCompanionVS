@@ -18,6 +18,11 @@ namespace GamepadCompanion.Input;
 // pulgar que el stick. Si el usuario le asignó algo a A, manda su binding y el
 // click queda sólo en RT.
 //
+// Los clicks salen por dos lados: a los GuiDialog, acá mismo, como MouseEvent; y
+// a los botones del MouseState de OpenTK, que es lo único que lee ImGui. Eso
+// segundo lo escribe NativeMouseMirror con LeftHeld/RightHeld desde el `finally`
+// del driver.
+//
 // MouseMove se emite cada tick (incluso si el stick no se movió) para
 // que el hover state se actualice y los sliders/drags reaccionen entre
 // Down y Up. OnMouseDown/Up usan edge-detect contra el tick previo.
@@ -29,6 +34,12 @@ public sealed class CursorClickMapper
     private readonly VirtualCursor cursor;
     private readonly ButtonMapper buttons;
 
+    // Botones del cursor apretados en este tick. El driver los limpia al empezar
+    // cada tick, así un frame sin cursor (se cerró el diálogo, radial, foco
+    // perdido) los deja en false y el espejo de OpenTK suelta solo.
+    public bool LeftHeld  { get; private set; }
+    public bool RightHeld { get; private set; }
+
     public CursorClickMapper(ICoreClientAPI capi, VirtualCursor cursor,
                              ButtonMapper buttons)
     {
@@ -36,6 +47,8 @@ public sealed class CursorClickMapper
         this.cursor = cursor;
         this.buttons = buttons;
     }
+
+    public void ClearHeld() => LeftHeld = RightHeld = false;
 
     public void Apply(GamepadState current, GamepadState previous)
     {
@@ -47,10 +60,11 @@ public sealed class CursorClickMapper
         DispatchMove(x, y);
 
         bool aClicks = buttons.Bindings[GamepadButton.A] is null;
-        EdgeDispatch(LeftDown(current, aClicks), LeftDown(previous, aClicks),
+        LeftHeld  = LeftDown(current, aClicks);
+        RightHeld = current.LeftTrigger > Threshold;
+        EdgeDispatch(LeftHeld, LeftDown(previous, aClicks),
                      EnumMouseButton.Left, x, y);
-        EdgeDispatch(current.LeftTrigger > Threshold,
-                     previous.LeftTrigger > Threshold,
+        EdgeDispatch(RightHeld, previous.LeftTrigger > Threshold,
                      EnumMouseButton.Right, x, y);
     }
 

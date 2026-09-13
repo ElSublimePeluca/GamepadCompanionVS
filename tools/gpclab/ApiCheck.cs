@@ -93,6 +93,14 @@ internal static class ApiCheck
         ("Vintagestory.API.Client.ElementBounds", new[]
             { "absX", "absY", "OuterWidth", "OuterHeight", "InnerWidth", "InnerHeight",
               "fixedWidth", "fixedHeight", "ParentBounds", "PointInside" }),
+
+        // --- Cursor virtual en menús de ImGui: VSImGui toma los clicks de los botones del
+        //     MouseState de la ventana de OpenTK, y NativeMouseMirror los escribe por
+        //     reflection sobre un campo privado de OpenTK.
+        ("Vintagestory.Client.ScreenManager", new[] { "Platform" }),
+        ("Vintagestory.Client.NoObf.ClientPlatformWindows", new[] { "window" }),
+        ("OpenTK.Windowing.Desktop.NativeWindow", new[] { "MouseState" }),
+        ("OpenTK.Windowing.GraphicsLibraryFramework.MouseState", new[] { "_buttons" }),
     };
 
     public static int Run(string gameRoot, string[] args)
@@ -100,10 +108,13 @@ internal static class ApiCheck
         bool update = args.Contains("--update");
         var api = Assembly.LoadFrom(Path.Combine(gameRoot, "VintagestoryAPI.dll"));
         var lib = Assembly.LoadFrom(Path.Combine(gameRoot, "VintagestoryLib.dll"));
+        // OpenTK viene con el juego; el espejo de clicks para ImGui lee sus internals.
+        var glfw = Assembly.LoadFrom(Path.Combine(gameRoot, "Lib", "OpenTK.Windowing.GraphicsLibraryFramework.dll"));
+        var desktop = Assembly.LoadFrom(Path.Combine(gameRoot, "Lib", "OpenTK.Windowing.Desktop.dll"));
 
         var lines = new List<string>();
         foreach (var (typeName, members) in Targets)
-            lines.AddRange(DumpType(typeName, members, api, lib));
+            lines.AddRange(DumpType(typeName, members, api, lib, glfw, desktop));
         lines.AddRange(DumpValues(api, lib));
         lines.Sort(StringComparer.Ordinal);
 

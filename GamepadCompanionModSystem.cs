@@ -472,6 +472,7 @@ public class GamepadCompanionModSystem : ModSystem
         GlyphRuntime.Clear();
         driver?.ReleaseAll();
         ScreenInputMirror.ClearAll();
+        NativeMouseMirror.ClearAll();
     }
 
     // Helper: el callback persiste los slots actuales tras cualquier cambio
@@ -529,6 +530,8 @@ public class GamepadCompanionModSystem : ModSystem
         // corriendo mientras se desarma el stack de un Dispose reentrante
         // desde el menú Escape — ya no puede volver a escribir nada.
         ScreenInputMirror.ClearAll();
+        // Lo mismo con los botones de OpenTK que lee ImGui.
+        NativeMouseMirror.ClearAll();
         driver?.Radial.TryClose();
         driver?.Radial.Dispose();
         gamepad?.Dispose();

@@ -53,7 +53,7 @@ public sealed class CursorNavigator
         // búsqueda tiene que salir de donde está el mouse.
         if (!cursor.TryTakeControl(frameW, frameH)) return false;
 
-        if (!worldMap && CollectTargets())
+        if (!worldMap && CollectTargets() > 0)
         {
             int i = CursorNavigation.FindNext(targets, cursor.X, cursor.Y, dir);
             // Hay destinos pero ninguno para ese lado: el cursor se queda, como en
@@ -65,12 +65,13 @@ public sealed class CursorNavigator
             return true;
         }
 
-        // Sin destinos: un paso del tamaño de un slot, como hacía el D-pad antes.
-        // Fuera del mapa casi no pasa, porque con un diálogo abierto los slots del
-        // hotbar ya cuentan como destinos; en una GUI de mod dibujada con
-        // elementos propios, lo que el D-pad no alcance queda para el stick. El
-        // paso va escalado, porque los 52 px fijos de antes ni siquiera seguían
-        // la grilla del inventario con un GUIScale distinto de 1.
+        // Sin destinos de diálogo: un paso del tamaño de un slot, como hacía el
+        // D-pad antes. Pasa en el mapa y en diálogos sin nada que el D-pad
+        // reconozca, como un menú de ImGui (el de xSkills) o la GUI de un mod
+        // dibujada a mano: ahí los slots del hotbar, que sí son destinos, no
+        // sirven para recorrer el menú. El paso va escalado, porque los 52 px
+        // fijos de antes ni siquiera seguían la grilla del inventario con un
+        // GUIScale distinto de 1.
         int step = (int)Math.Round(GuiElement.scaled(
             GuiElementPassiveItemSlot.unscaledSlotSize + GuiElementItemSlotGridBase.unscaledSlotPadding));
         return dir switch
@@ -82,14 +83,15 @@ public sealed class CursorNavigator
         };
     }
 
-    // true si quedó al menos un destino. Se junta en cada pulsación y no por
-    // frame: los diálogos cambian (scroll, pestañas, un cofre que se abre) y
-    // recorrerlos cuesta nada al lado de un frame.
-    private bool CollectTargets()
+    // Cuántos destinos salieron de diálogos; los del hotbar se juntan igual pero no
+    // cuentan. Se juntan en cada pulsación y no por frame: los diálogos cambian
+    // (scroll, pestañas, un cofre que se abre) y recorrerlos cuesta nada al lado
+    // de un frame.
+    private int CollectTargets()
     {
         try
         {
-            CursorTargets.Collect(capi, targets);
+            return CursorTargets.Collect(capi, targets);
         }
         catch (Exception e)
         {
@@ -103,7 +105,7 @@ public sealed class CursorNavigator
                 capi.Logger.Warning(
                     "GamepadCompanion: could not collect D-pad targets, using fixed steps instead: {0}", e);
             }
+            return 0;
         }
-        return targets.Count > 0;
     }
 }

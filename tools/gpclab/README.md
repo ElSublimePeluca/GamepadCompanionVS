@@ -35,8 +35,9 @@ dotnet run --project tools/gpclab -- render [salida.png]
 
 Vuelca por reflection las firmas del engine de las que dependen los glifos (los seams de
 Harmony, los campos que se leen, los valores de los que salen las cuentas de píxeles) y el
-cursor virtual (los privados de los que salen los destinos del D-pad), y las compara contra
-`apisurface.baseline.txt`, que está commiteado. Sale con código ≠ 0 si algo cambió.
+cursor virtual (los privados de los que salen los destinos del D-pad, y el campo de OpenTK
+del que ImGui toma los clics), y las compara contra `apisurface.baseline.txt`, que está
+commiteado. Sale con código ≠ 0 si algo cambió.
 
 **Correlo el día que actualizás el juego, antes de abrir el IDE.** Si algo cambió, es un
 error el día correcto en vez de un issue de un usuario tres semanas después. Cuando el
@@ -68,7 +69,9 @@ nadie ejercita a mano y que ya costaron bugs reales:
   campo de texto ancho y la fila del selector de recetas. Lo que no se prueba acá es de qué
   elementos salen los destinos (`CursorTargets`): eso necesita diálogos compuestos de verdad.
 - **A y RT son un mismo clic en los diálogos.** Apretarlos en cualquier orden tiene que dar un
-  solo MouseDown y un solo MouseUp, y con un binding en A sólo clickea RT.
+  solo MouseDown y un solo MouseUp, y con un binding en A sólo clickea RT. También la regla con
+  la que ese clic se refleja en los botones de OpenTK para los menús de ImGui: se suelta sólo
+  lo propio y nunca un botón físico apretado.
 
 Sale con código ≠ 0 si algo falla. Corre en la laptop, sin el juego instalado.
 
