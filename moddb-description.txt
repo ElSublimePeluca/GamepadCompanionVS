@@ -1,5 +1,5 @@
 GamepadCompanion — descripción para la página de ModDB
-(en inglés, como la original; parte de la descripción anterior con lo de 1.12.0
+(en inglés, como la original; parte de la descripción anterior con lo de 1.13.0
 integrado. Los cambios respecto de la versión previa están listados al final de
 este archivo, después de la línea de corte, para que puedas revisarlos — esa
 parte NO va a la página.)
@@ -16,7 +16,7 @@ Full native gamepad support for Vintage Story 1.22+, designed as a client-side m
 - **Movement and camera** via sticks, with configurable sensitivity (horizontal/vertical), dead zone, and pitch inversion.
 - **12-slot radial menu** (LB + right stick). Defaults to Character, Chat, Handbook, Settings, and Virtual Keyboard; the remaining slots are assignable from the in-game dialog.
 - **Contextual button mapping**: B closes the open dialog or drops the active item depending on context; A jumps; X/Y/Back/Start mapped to tool mode, inventory, map, and pause menu.
-- **Virtual cursor over GUIs**: when a modal dialog is open, a yellow cursor appears. Hold RB for smooth right-stick movement; DPad without RB steps it slot-by-slot for fast inventory navigation. RT/LT click left/right.
+- **Virtual cursor over GUIs**: when a modal dialog is open, a yellow cursor appears. The right stick moves it freely, like a mouse; the DPad jumps it to the nearest slot, recipe, tab or button in that direction for fast inventory navigation. RT or A left-click (they count as one button), LT right-clicks.
 - **World map zoom with the D-Pad**: with the fullscreen map open, D-Pad ↑/↓ zooms in/out (one mouse-wheel notch per press) while ←/→ keeps moving the cursor for clicking waypoints.
 - **Sneak and sprint toggles** via L3/R3 with a HUD indicator in the top-right corner. They are the game's Shift and Ctrl, so they double as the click modifier: shift-click in inventory, ctrl-click placement, and anything else a mod hangs off them.
 - **Precision mode** (DPad Up) reduces camera sensitivity by a configurable factor for aiming at specific blocks.
@@ -84,20 +84,10 @@ The four PlayStation face symbols are drawn by the mod as vector shapes; no thir
 ================================================================================
 CAMBIOS RESPECTO DE LA DESCRIPCIÓN ANTERIOR (no va a la página)
 
-  1. Feature nueva arriba de todo: los hints del juego con los botones del mando.
-  2. "Ctrl and Shift toggles" → "Sneak and sprint toggles", que es lo que ahora
-     dice el HUD, aclarando que siguen siendo el modificador de los clicks.
-  3. Se agregó el bullet de "hold-a-key bindings", que existe desde la 1.8.0 y
-     nunca había estado en la descripción.
-  4. El editor pasa de tres tabs a cuatro (entra Hints, con la vista previa).
-  5. Todos los comandos con PUNTO en vez de barra, más el aviso explícito.
-     La descripción vieja decía /gpconfig y /gpaxes, y eso nunca funcionó.
-  6. "five layouts" → seis, y la tabla suma la fila de Xbox por Bluetooth.
-  7. DualSense / DualShock 4 pasa de ⚠️ "driver-dependent" a ✅: desde la 1.11.0
-     se detectan por vendor id o por forma. Si preferís ser conservador, se puede
-     dejar en ⚠️ — vos sabés mejor qué reportes llegaron.
-  8. Se agregaron .gpdevice y .gpglyphs al párrafo de diagnóstico.
-  9. Nota de Steam Deck / Flatpak y /dev/input.
- 10. El disclaimer ahora dice que el mod usa Harmony y parchea cuatro métodos,
-     y cómo está acotado. Ese párrafo existe justamente para esto.
- 11. Créditos y licencia al final.
+  1. El bullet del cursor virtual: el stick derecho ya no necesita RB, el DPad
+     salta al slot, receta, pestaña o botón más cercano en vez de moverse de a
+     un slot, y A clickea igual que RT. Es el único cambio de texto de la página.
+  2. Para revisar, sin tocar: el disclaimer dice "no `unsafe` blocks", pero el
+     mod usa `unsafe` desde la primera versión (los punteros de GLFW del cursor
+     y del lector del mando). Venía así de la descripción anterior; si querés,
+     se saca esa frase.

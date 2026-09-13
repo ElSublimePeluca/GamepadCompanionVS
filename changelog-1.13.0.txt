@@ -1,0 +1,51 @@
+GamepadCompanion v1.13.0
+
+Menus: the D-pad goes to the next slot or button, and the cursor no longer needs RB
+
+  Reported by nolepguy (#9). In the inventory the crafted knife could not be
+  taken out of the output slot, and flint knapping would not let the hoe be
+  picked: the cursor always jumped past them.
+
+  Until now the D-pad moved the cursor a fixed 52 pixels per press, without
+  looking at what was on screen, and that distance was never tied to the layout
+  or to the interface scale. The crafting output sits a bit further below the
+  grid than one slot, so the cursor could stop just above it and just below it
+  and never on it, however many times you pressed. In the knapping recipe
+  picker each press drifted by a pixel, and depending on where the cursor
+  started, a recipe could be skipped. At an interface scale other than 100% the
+  steps did not even follow the inventory grid.
+
+  Now the D-pad jumps to the nearest thing you can click in the direction you
+  press: inventory and container slots, the hotbar while a menu is open, the
+  recipe picker for knapping, clay forming and smithing, the tool mode
+  selector, tabs, buttons, switches, drop-down lists and text fields. If there
+  is nothing in that direction, the cursor stays where it is. Sliders and
+  scroll bars are left out on purpose, since clicking the middle of a slider
+  changes its value, and so are title bars. Anything the D-pad cannot reach,
+  such as a mod window drawn with its own elements, is one push of the right
+  stick away. The world map keeps its own controls: D-pad up and down zoom, and
+  left and right move the cursor in steps, now scaled with the interface.
+
+  The right stick now moves the cursor in any menu on its own. Holding RB is no
+  longer needed, and RB does nothing in menus. The stick uses the dead zone from
+  the Sensitivity tab, the same one as the camera. To take the cursor back from
+  a physical mouse it has to be pushed deliberately, so a controller with a bit
+  of drift resting on the desk does not fight your mouse.
+
+New: A clicks in menus
+
+  With a menu open, A clicks just like RT. The two count as a single button, so
+  pressing both, in any order, never clicks twice. A is meant for the D-pad:
+  your left thumb moves between slots and your right thumb confirms. RT remains
+  the natural click when you point with the right stick, because your thumb and
+  index finger can move the cursor and hold the click at the same time, which
+  is what dragging items across slots needs.
+
+  If you assigned something to A in the Buttons tab, A keeps doing that, and RT
+  is the click.
+
+Nothing changed outside menus
+
+  Movement, the camera, the triggers in the world, jumping with A, and what the
+  D-pad does while you play (hotbar, precision mode, sitting) are exactly as
+  they were in 1.12.0.
