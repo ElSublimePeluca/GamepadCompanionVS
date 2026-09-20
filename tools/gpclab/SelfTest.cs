@@ -38,6 +38,7 @@ internal static class SelfTest
         failures += GlyphTests.Run();
         failures += CursorNavTests.Run();
         failures += CursorClickTests.Run();
+        failures += JumpLatchTests.Run();
         Console.WriteLine(failures == 0
             ? "\n  todo OK"
             : $"\n  {failures} fallaron");

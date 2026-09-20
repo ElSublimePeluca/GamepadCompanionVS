@@ -72,6 +72,11 @@ nadie ejercita a mano y que ya costaron bugs reales:
   solo MouseDown y un solo MouseUp, y con un binding en A sólo clickea RT. También la regla con
   la que ese clic se refleja en los botones de OpenTK para los menús de ImGui: se suelta sólo
   lo propio y nunca un botón físico apretado.
+- **El salto de A no se dispara al cerrarse un diálogo.** Varios diálogos del juego cierran en
+  el MouseDOWN (`GuiDialogToolMode`, el selector de recetas del knapping), así que el frame
+  siguiente encontraba A todavía apretada y con permiso de saltar: elegir un modo de
+  herramienta hacía saltar al personaje. Hace falta soltar A y volver a apretarla, y mantenerla
+  en el mundo tiene que seguir saltando.
 
 Sale con código ≠ 0 si algo falla. Corre en la laptop, sin el juego instalado.
 

@@ -41,6 +41,10 @@ public sealed class MovementMapper
 
     private readonly ICoreClientAPI capi;
 
+    // Ver JumpLatched: A mantenida desde antes de que el salto estuviera
+    // permitido no salta al habilitarse.
+    private bool jumpLatched;
+
     public MovementMapper(ICoreClientAPI capi)
     {
         this.capi = capi;
@@ -48,7 +52,13 @@ public sealed class MovementMapper
 
     // Suelta todas las teclas que proyectamos, dejando pasar solo el teclado
     // físico. Para los early returns del driver (sin foco, sin gamepad).
-    public void Release() => Project(false, false, false, false, false);
+    // Latchea el salto de paso: volver de un alt-tab, o reconectar el pad, con
+    // A apretada no tiene que saltar hasta que el usuario la vuelva a apretar.
+    public void Release()
+    {
+        jumpLatched = true;
+        Project(false, false, false, false, false);
+    }
 
     public void Apply(GamepadState current, bool allowMove, bool allowJump)
     {
@@ -77,9 +87,28 @@ public sealed class MovementMapper
             }
         }
 
-        Project(fwd, back, left, right,
-                allowJump && current.IsDown(GamepadButton.A));
+        // El salto NO puede ser un nivel puro. Desde v1.13.0 A también clickea
+        // en los diálogos, y varios diálogos del juego se cierran en el
+        // MouseDOWN: GuiElementSkillItemGrid llama a OnSlotClick desde
+        // OnMouseDownOnElement, y ahí adentro tanto GuiDialogToolMode (el
+        // default de X) como GuiDialogBlockEntityRecipeSelector (knapping,
+        // alfarería, yunque) hacen TryClose(). El diálogo desaparece con A
+        // todavía apretada y en el frame siguiente allowJump vuelve a ser true:
+        // el personaje saltaba al elegir un modo de herramienta o una receta
+        // (reportado en ModDB). El engine tiene el mismo nivel —
+        // `entityControls.Jump = KeyboardState[jumpKey] && MouseGrabbed` — pero
+        // ahí la tecla de saltar y la de clickear nunca son la misma.
+        bool aDown = current.IsDown(GamepadButton.A);
+        jumpLatched = JumpLatched(jumpLatched, aDown, allowJump);
+
+        Project(fwd, back, left, right, aDown && allowJump && !jumpLatched);
     }
+
+    // Estado siguiente del latch del salto: se prende mientras A esté apretada
+    // sin permiso para saltar, y sólo se apaga al soltarla. Estático y puro
+    // para poder probarlo sin abrir el juego (gpclab selftest).
+    internal static bool JumpLatched(bool latched, bool aDown, bool allowJump)
+        => aDown && (latched || !allowJump);
 
     private void Project(bool fwd, bool back, bool left, bool right, bool jump)
     {
