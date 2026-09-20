@@ -7,6 +7,7 @@ using Cairo;
 // Cairo tambien define un tipo Path; en este archivo Path siempre es el de System.IO.
 using Path = System.IO.Path;
 using GamepadCompanion.Glyphs;
+using GamepadCompanion.Gui;
 using Vintagestory.API.Client;
 using Vintagestory.API.Config;
 
@@ -144,6 +145,7 @@ internal static class Measure
         }
 
         DialogStrings();
+        PromptDialog();
 
         Console.WriteLine(
             $"\n  Anchos a fuente 20 / GUIScale 1, la del cartel del bloque mirado.\n" +
@@ -151,6 +153,61 @@ internal static class Measure
             $"{font.GetTextExtents(GlyphLabels.ToggleMark).Width:0}px.\n" +
             "  Para saber si una etiqueta entra en cada caja de ícono: gpclab boxes.");
         return 0;
+    }
+
+    // El diálogo que pregunta por la disposición de botones crece con su texto:
+    // cuatro párrafos que envuelven, y GuiElementStaticText dibuja igual aunque
+    // no entre a lo alto (mismo bicho que el issue #7). Acá se miden los cuatro
+    // con la tipografía REAL, en los tres idiomas y a tres GUIScale, y el alto
+    // lo calcula LayoutPromptDialog.Measure — la misma función que corre en el
+    // juego, no una copia de la fórmula.
+    //
+    // El techo: la pantalla más chica con la que alguien puede estar jugando.
+    // 768 de alto es el piso razonable de un portátil viejo, y el diálogo tiene
+    // que entrar con aire para no quedar pegado a los bordes.
+    private static void PromptDialog()
+    {
+        const double screenH = 768;
+        string? langDir = FindRepoFile("assets/gamepadcompanion/lang");
+        if (langDir is null) return;
+
+        Console.WriteLine("\n  alto del diálogo de disposición (crece con el texto)");
+        var text = new TextDrawUtil();
+        double bodyW = LayoutPromptDialog.Measure(0, 0, 0, 0).BodyW;
+
+        foreach (string file in Directory.GetFiles(langDir, "*.json").OrderBy(f => f))
+        {
+            Dictionary<string, string>? lang;
+            try
+            {
+                lang = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+                    File.ReadAllText(file));
+            }
+            catch (Exception e) { Console.WriteLine($"    {Path.GetFileName(file)}: {e.Message}"); continue; }
+            if (lang is null) continue;
+
+            foreach (float scale in new[] { 1.0f, 1.25f, 1.5f })
+            {
+                RuntimeEnv.GUIScale = scale;
+                double H(string key, bool detail) => text.GetMultilineTextHeight(
+                    detail ? CairoFont.WhiteDetailText() : CairoFont.WhiteSmallText(),
+                    Text(lang, key), GuiElement.scaled(bodyW),
+                    // Explícito y no Default: fuera del juego Lang.CurrentLocale
+                    // es null y Default lo lee.
+                    EnumLinebreakBehavior.AfterWord) / scale;
+
+                var g = LayoutPromptDialog.Measure(
+                    H("layout-prompt-intro", false), H("layout-classic-desc", true),
+                    H("layout-modern-desc", true),   H("layout-prompt-later", true));
+                double onScreen = g.DialogH * scale;
+                string verdict = onScreen <= screenH - 40 ? "ok" : "NO ENTRA";
+                Console.WriteLine(
+                    $"    {Path.GetFileNameWithoutExtension(file),-8} GUIScale {scale:0.00}  " +
+                    $"alto {g.DialogH,5:0} sin escalar = {onScreen,5:0}px en pantalla " +
+                    $"(techo {screenH:0})  {verdict}");
+            }
+        }
+        RuntimeEnv.GUIScale = 1.0f;
     }
 
     // Los textos que el mod dibuja en su propio diálogo, medidos contra la caja
@@ -171,9 +228,12 @@ internal static class Measure
         const double hintLabelW = 210;             // ConfigDialog.HintLabelW
         const double hintControlW = 230;           // ConfigDialog.HintControlW
         const double sensLabelW = 185;             // ConfigDialog.SensLabelW
+        const double btnLabelW = 100;              // ConfigDialog.BtnLabelW
+        const double btnPickerW = 260;             // ConfigDialog.BtnPickerW
         const double overlayW = 124;               // ToggleHudOverlay.OverlayW
         var tabKeys = new[] { "tab-wheel", "tab-buttons", "tab-sensitivity", "tab-hints" };
-        var buttonKeys = new[] { "hints-style-off", "hints-style-auto", "hints-style-auto-resolved" };
+        var buttonKeys = new[] { "hints-style-off", "hints-style-auto", "hints-style-auto-resolved",
+                                 "layout-classic", "layout-modern" };
         // Cada texto contra LA CAJA QUE LE TOCA y con la fuente que el código le
         // pone de verdad. Medirlos todos contra el ancho del diálogo es lo que
         // dejó pasar el primer desborde: `AddStaticText` no recorta, envuelve, y
@@ -196,6 +256,12 @@ internal static class Measure
             ("hud-sprint", false, overlayW),
             ("hud-sneak", false, overlayW),
             ("hud-precision", false, overlayW),
+            // Tab Botones: la etiqueta de la fila del preset comparte columna
+            // con "DPad Down" y compañía, que son cortas y en inglés siempre.
+            // "Disposición" no lo es, y AddStaticText envuelve en vez de
+            // recortar: si no entra, se come la fila del botón A.
+            ("layout-label", false, btnLabelW),
+            ("button-wheel", true, btnPickerW),
         };
 
         Console.WriteLine("\n  textos del diálogo de config, por idioma");

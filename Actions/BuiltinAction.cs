@@ -14,6 +14,9 @@ namespace GamepadCompanion.Actions;
 //   "dropOrDismiss"  - cerrar dialog modal abierto, sino soltar item
 //   "hotbarPrev"     - slot anterior del hotbar
 //   "hotbarNext"     - slot siguiente del hotbar
+//   "openKeyboard"   - abrir el teclado virtual
+//   "sitDown"        - sentarse en el piso (la tecla de `sitdown`)
+//   "precisionToggle"- modo precisión de la cámara
 public sealed class BuiltinAction : IGameAction
 {
     public string Code { get; }
@@ -34,6 +37,8 @@ public sealed class BuiltinAction : IGameAction
             case "hotbarPrev":     BuiltinActions.HotbarPrev(capi); break;
             case "hotbarNext":     BuiltinActions.HotbarNext(capi); break;
             case "openKeyboard":   BuiltinActions.OpenVirtualKeyboard(capi); break;
+            case "sitDown":        BuiltinActions.SitDown(capi); break;
+            case "precisionToggle": BuiltinActions.TogglePrecision(capi); break;
             default:
                 capi.Logger.Warning(
                     $"GamepadCompanion: builtin action '{Code}' no implementada");
@@ -51,7 +56,16 @@ public sealed class BuiltinAction : IGameAction
         ("hotbarPrev",    Lang.Get("gamepadcompanion:builtin-hotbarprev")),
         ("hotbarNext",    Lang.Get("gamepadcompanion:builtin-hotbarnext")),
         ("openKeyboard",  Lang.Get("gamepadcompanion:builtin-openkeyboard")),
+        ("sitDown",       Lang.Get("gamepadcompanion:builtin-sitdown")),
+        ("precisionToggle", Lang.Get("gamepadcompanion:builtin-precision")),
     };
+
+    // Acciones que se repiten mientras el botón está apretado, con un retardo
+    // inicial. Sólo la navegación del hotbar: pedido de pngwn para poder
+    // cruzar la barra con un bumper mantenido en vez de doce toques. El resto
+    // (sentarse, precisión, cerrar diálogo) son toggles o aperturas, y
+    // repetirlos sería prenderlos y apagarlos a 8 Hz.
+    public bool Repeats => Code is "hotbarPrev" or "hotbarNext";
 
     private static string DefaultLabelFor(string code)
     {

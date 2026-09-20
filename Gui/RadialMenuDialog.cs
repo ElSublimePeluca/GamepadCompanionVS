@@ -5,8 +5,9 @@ using Vintagestory.API.Client;
 
 namespace GamepadCompanion.Gui;
 
-// Rueda radial de 12 slots. Activación: mantener LB. Selección: stick derecho
-// (con dead zone). Confirmación: soltar LB. Cancelación: B durante el hold.
+// Rueda radial de 12 slots. Activación: mantener el botón que diga el layout
+// (LB en el clásico, D-pad ↑ en el nuevo). Selección: stick derecho (con dead
+// zone). Confirmación: soltar ese botón. Cancelación: B durante el hold.
 //
 // Estado interno:
 //   - HighlightedSlot in [-1, 11]. -1 = stick en dead zone, sin selección activa.
@@ -40,6 +41,12 @@ public sealed class RadialMenuDialog : HudElement
     // falla antes de la inyección.
     public SlotBindings Bindings { get; set; } = SlotBindings.BuildDefault();
 
+    // Botón que abre la rueda mientras se lo mantiene. Lo fija el ModSystem
+    // desde el layout activo; el default es el de siempre por si algo falla
+    // antes de esa inyección. ButtonMapper no le ejecuta ni binding ni
+    // default: el hold ya significa esto.
+    public GamepadButton OpenButton { get; set; } = GamepadButton.LeftBumper;
+
     public override double DrawOrder => 0.5;
     public override EnumDialogType DialogType => EnumDialogType.HUD;
     public override string ToggleKeyCombinationCode => null!;
@@ -51,14 +58,20 @@ public sealed class RadialMenuDialog : HudElement
         Compose();
     }
 
-    public void OnGamepadTick(GamepadState current, GamepadState previous)
+    // allowOpen=false bloquea SÓLO la apertura, no la rueda ya abierta: cuando
+    // el botón de la rueda es del D-pad, la UI (un diálogo modal, el teclado
+    // virtual) se lo queda para navegar. Con la rueda abierta el driver ya
+    // cortó todo lo demás, así que ahí no hay conflicto que resolver.
+    public void OnGamepadTick(GamepadState current, GamepadState previous,
+                              bool allowOpen = true)
     {
-        bool lbNow  = current.IsDown(GamepadButton.LeftBumper);
-        bool lbPrev = previous.IsDown(GamepadButton.LeftBumper);
+        bool holdNow  = current.IsDown(OpenButton);
+        bool holdPrev = previous.IsDown(OpenButton);
         bool isOpen = IsOpened();
 
-        if (lbNow && !lbPrev && !isOpen)
+        if (holdNow && !holdPrev && !isOpen)
         {
+            if (!allowOpen) return;
             HighlightedSlot = -1;
             Compose();
             TryOpen();
@@ -81,7 +94,7 @@ public sealed class RadialMenuDialog : HudElement
             Compose();
         }
 
-        if (!lbNow && lbPrev)
+        if (!holdNow && holdPrev)
         {
             int confirmed = HighlightedSlot;
             var action = confirmed >= 0 ? Bindings[confirmed] : null;

@@ -72,6 +72,12 @@ nadie ejercita a mano y que ya costaron bugs reales:
   solo MouseDown y un solo MouseUp, y con un binding en A sólo clickea RT. También la regla con
   la que ese clic se refleja en los botones de OpenTK para los menús de ImGui: se suelta sólo
   lo propio y nunca un botón físico apretado.
+- **Los dos presets de botones y la migración.** Que una instalación nueva arranque con el
+  layout nuevo, que a quien ya tenía config se le respete el clásico y se le pregunte, que un
+  valor desconocido en el JSON no lo deje en un layout inventado, y —lo que más importa— que
+  cambiar de preset, en cualquier sentido, no le pise ni le borre un binding propio. Incluye
+  que los glifos de los hints sigan al preset solos, porque salen de la acción efectiva y no
+  de una tabla paralela.
 - **El salto de A no se dispara al cerrarse un diálogo.** Varios diálogos del juego cierran en
   el MouseDOWN (`GuiDialogToolMode`, el selector de recetas del knapping), así que el frame
   siguiente encontraba A todavía apretada y con permiso de saltar: elegir un modo de
@@ -88,6 +94,11 @@ Dos tablas:
   tipografía del cartel. Sirve para elegir una etiqueta nueva sin adivinar.
 - La de **textos del diálogo del mod**, medidos contra la caja que les toca **en los tres
   idiomas** y a GUIScale 1.0 y 1.5, leyendo los JSON de `assets/gamepadcompanion/lang/`.
+
+- El **alto del diálogo de disposición**, que crece con su texto: se miden los cuatro párrafos
+  con la tipografía real en los tres idiomas y a GUIScale 1.0/1.25/1.5, y el alto lo calcula
+  `LayoutPromptDialog.Measure`, la misma función que corre en el juego. El techo es una pantalla
+  de 768 de alto.
 
 La segunda existe porque los botones de VS se agrandan solos para que el label entre en una
 línea y nadie los clippea, así que un label largo se dibuja fuera del panel, flotando sobre el

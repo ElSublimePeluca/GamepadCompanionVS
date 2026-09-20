@@ -25,6 +25,11 @@ public class GamepadCompanionModSystem : ModSystem
     private InputTracer? tracer;
     private GlyphSession? glyphs;
 
+    // Hay que preguntarle al usuario qué layout de botones quiere. Se resuelve
+    // en ResolveLayout al cargar la config y se contesta una sola vez, al
+    // entrar al mundo (OnLevelFinalize).
+    private bool askLayout;
+
     // Expone el driver para que helpers globales (BuiltinActions, etc.)
     // accedan a estado del input sin acoplarse al ModSystem en cada call.
     public GamepadInputDriver? Driver => driver;
@@ -42,6 +47,11 @@ public class GamepadCompanionModSystem : ModSystem
         // ModSystem se reinstancia en cada carga de mundo: rearmamos el espejo
         // para que un ClearAll() de la sesión anterior no lo deje apagado.
         ScreenInputMirror.Reset();
+        // ANTES de cargar: si el archivo no existía, esta es una instalación
+        // nueva y no hay layout viejo que respetar. Se mira el archivo y no el
+        // resultado de LoadConfigSafe porque una config ROTA también devuelve
+        // defaults, y ese usuario sí venía de antes (ver ResolveLayout).
+        bool hadConfigFile = ConfigFileExists();
         config = LoadConfigSafe(api);
         api.StoreModConfig(config, ConfigFile);
 
@@ -105,6 +115,14 @@ public class GamepadCompanionModSystem : ModSystem
         driver.Buttons.Bindings = ButtonBindings.FromConfig(config.ButtonBindings, api);
         config.ButtonBindings = driver.Buttons.Bindings.ToConfig();
 
+        // Layout: la capa de ABAJO de los bindings, así que va después de
+        // cargarlos. persist:false porque el StoreModConfig de acá abajo ya
+        // guarda todo junto; record:false mientras la pregunta esté pendiente,
+        // porque escribir "classic" ahí sería darla por contestada y el que
+        // cierra el juego antes de entrar al mundo no la vería nunca más.
+        (GamepadLayoutKind layout, askLayout) = DecideLayout(config.Layout, hadConfigFile);
+        ApplyLayout(layout, persist: false, record: !askLayout);
+
         api.StoreModConfig(config, ConfigFile);
 
         // Renderer.Before corre cada frame antes del render, en una ventana
@@ -142,6 +160,7 @@ public class GamepadCompanionModSystem : ModSystem
         // todavía podemos mandar el MouseUp/KeyUp de verdad; en Dispose el
         // ClientMain ya está marcado como disposed y los ignora en silencio.
         api.Event.LeaveWorld += OnLeaveWorld;
+        api.Event.LevelFinalize += OnLevelFinalize;
 
         RegisterCommands(api);
         // Le preguntamos al engine cuáles quedaron REGISTRADOS de verdad, en vez
@@ -151,6 +170,93 @@ public class GamepadCompanionModSystem : ModSystem
         LogRegisteredCommands(api);
 
         api.Logger.Notification("GamepadCompanion: client started, polling for gamepad");
+    }
+
+    // ── Layout de botones ────────────────────────────────────────────────────
+    //
+    // Que `Layout` no esté en el JSON quiere decir dos cosas distintas, y de
+    // cuál sea depende si se pregunta o no:
+    //
+    //   - sin archivo de config → instalación NUEVA. Arranca con el layout
+    //     nuevo y no se pregunta nada: no hay memoria muscular que romper.
+    //   - con archivo → venía de 1.13 o antes. Se queda con el CLÁSICO, que es
+    //     exactamente lo que ya tenía, y se le pregunta una vez. Un update no
+    //     le puede mover los botones sin avisar.
+    //
+    // La elección se persiste recién cuando la contesta — cerrar el diálogo
+    // cuenta como contestar "dejá todo como estaba" — y después no se vuelve a
+    // preguntar; cambiarla es la fila "Disposición" de la tab Botones.
+    //
+    // La regla va sola y sin estado, para poder probarla sin abrir el juego
+    // (gpclab selftest). Es la que decide si a alguien se le mueven los botones
+    // en un update, así que equivocarse acá no se ve hasta que lo reporta.
+    internal static (GamepadLayoutKind Kind, bool Ask) DecideLayout(
+        string? configured, bool hadConfigFile)
+        => configured is not null ? (GamepadLayout.Parse(configured), false)
+         : hadConfigFile          ? (GamepadLayoutKind.Classic, true)
+         :                          (GamepadLayout.FreshInstall, false);
+
+    // Enchufa un layout en todo lo que lo lee: los defaults de los botones, el
+    // botón que abre la rueda y los glifos de los hints del juego.
+    //
+    // NO toca los bindings del usuario, por diseño: el layout es la capa de
+    // abajo (ButtonBindings.Layout) y lo que el usuario asignó a mano queda
+    // arriba. Por eso cambiar de layout, en cualquier sentido y las veces que
+    // sea, no puede perder configuración.
+    private void ApplyLayout(GamepadLayoutKind kind, bool persist = true,
+                             bool record = true)
+    {
+        if (capi is null || driver is null || config is null) return;
+
+        var layout = GamepadLayout.Build(kind, capi);
+        // Soltar ANTES de cambiar: si había un "mantener tecla" apretado en un
+        // botón que el layout nuevo reserva para la rueda, ButtonMapper deja
+        // de mirarlo y el release se vuelve inalcanzable — la tecla quedaría
+        // pegada en KeyboardState hasta salir del mundo.
+        driver.Buttons.ReleaseHolds();
+        driver.Buttons.Bindings.Layout = layout;
+        driver.Radial.OpenButton = layout.Wheel;
+
+        if (record) config.Layout = GamepadLayout.ToCode(kind);
+        if (persist) capi.StoreModConfig(config, ConfigFile);
+        // Cambia qué botón muestra cada tecla en los carteles del juego.
+        InvalidateGlyphs();
+    }
+
+    private void OnLevelFinalize()
+    {
+        if (!askLayout || capi is null) return;
+        askLayout = false;
+        // Con un poco de aire: LevelFinalize cae en medio del armado de la GUI
+        // del mundo, y un diálogo abierto justo ahí compite con el fundido de
+        // carga y aparece a medio dibujar.
+        capi.Event.RegisterCallback(_ => ShowLayoutPrompt(), 1500);
+    }
+
+    private void ShowLayoutPrompt()
+    {
+        if (capi is null || config is null) return;
+        // El fallback es el layout que YA está activo (clásico): cerrar la
+        // ventana sin elegir tiene que dejar todo como estaba, y de paso
+        // contesta la pregunta para que no vuelva en cada sesión.
+        new LayoutPromptDialog(capi, GamepadLayout.Parse(config.Layout),
+                               kind => ApplyLayout(kind)).TryOpen();
+    }
+
+    private static bool ConfigFileExists()
+    {
+        try
+        {
+            return System.IO.File.Exists(
+                System.IO.Path.Combine(GamePaths.ModConfig, ConfigFile));
+        }
+        catch (System.Exception)
+        {
+            // Si no se puede ni mirar el directorio, la respuesta segura es
+            // "ya existía": se queda con el layout clásico y pregunta, que es
+            // el camino que no le mueve los botones a nadie por sorpresa.
+            return true;
+        }
     }
 
     // LoadModConfig es un JsonConvert.DeserializeObject pelado sobre el archivo
@@ -482,7 +588,8 @@ public class GamepadCompanionModSystem : ModSystem
     {
         if (capi is null || driver is null || config is null) return;
         new ConfigDialog(capi, driver.Radial.Bindings, driver.Buttons.Bindings,
-                         config, glyphs, OnConfigChanged).TryOpen();
+                         config, glyphs, OnConfigChanged,
+                         kind => ApplyLayout(kind)).TryOpen();
     }
 
     // Persiste todo el config (slots + sensibilidad). El dialog escribe
@@ -507,7 +614,10 @@ public class GamepadCompanionModSystem : ModSystem
         glyphs = null;
 
         if (capi is not null)
+        {
             capi.Event.LeaveWorld -= OnLeaveWorld;
+            capi.Event.LevelFinalize -= OnLevelFinalize;
+        }
         if (capi is not null && renderer is not null)
             capi.Event.UnregisterRenderer(renderer, EnumRenderStage.Before);
         if (capi is not null && cursorRenderer is not null)

@@ -1,6 +1,7 @@
 using GamepadCompanion.Input;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
+using Vintagestory.API.Config;
 
 namespace GamepadCompanion.Actions;
 
@@ -41,6 +42,32 @@ public static class BuiltinActions
     public static void HotbarPrev(ICoreClientAPI capi) => ChangeHotbarSlot(capi, -1);
     public static void HotbarNext(ICoreClientAPI capi) => ChangeHotbarSlot(capi, +1);
 
+    // Sentarse en el piso. `sitdown` SÍ es una hotkey de VS, y es rebindeable,
+    // pero no tiene Handler: `SystemPlayerControl.OnKeyDown` compara el keycode
+    // del evento contra `HotKeys["sitdown"].CurrentMapping.KeyCode` y listo. De
+    // ahí salen las dos cosas raras que reportó pngwn en ModDB:
+    //
+    //   - No aparecía en la lista de la rueda ni en la de los botones:
+    //     ConfigDialog.BuildEntryList sólo ofrece hotkeys CON Handler (las
+    //     demás no se pueden disparar) y ésta no tiene.
+    //   - Tampoco servía HotkeyDispatcher.Trigger, por lo mismo.
+    //
+    // Así que mandamos la tecla de verdad, resolviéndola del binding vivo en vez
+    // de hardcodear G: quien la haya rebindeado en las opciones del juego
+    // igual se sienta.
+    public static void SitDown(ICoreClientAPI capi)
+        => new KeyPressAction(SitKeyCode(capi),
+                              label: Lang.Get("gamepadcompanion:builtin-sitdown"))
+            .Execute(capi);
+
+    // G es el default de vanilla, y el fallback si el hotkey no existiera (otra
+    // versión del juego, o un mod que lo saque).
+    public const int SitFallbackKeyCode = (int)GlKeys.G;
+
+    public static int SitKeyCode(ICoreClientAPI capi)
+        => capi.Input.GetHotKeyByCode("sitdown")?.CurrentMapping?.KeyCode
+           ?? SitFallbackKeyCode;
+
     // Abre el teclado virtual. Lo resolvemos via ModLoader para no
     // acoplar Actions/* a GamepadInputDriver directamente. Tipo HUD,
     // así no roba focus del chat (caso de uso principal).
@@ -50,6 +77,16 @@ public static class BuiltinActions
         var dialog = mod?.Driver?.VirtualKeyboard;
         if (dialog is null) return;
         if (!dialog.IsOpened()) dialog.TryOpen();
+    }
+
+    // Modo precisión (baja la sensibilidad de cámara por PrecisionFactor).
+    // Hasta 1.13 vivía hardcodeado en GamepadInputDriver sobre D-pad ↑, fuera
+    // de ButtonMapper. Pasa a builtin porque los layouts lo mueven de botón, y
+    // de paso se vuelve asignable a cualquier botón o slot de la rueda.
+    public static void TogglePrecision(ICoreClientAPI capi)
+    {
+        var mod = capi.ModLoader.GetModSystem<GamepadCompanionModSystem>();
+        mod?.Driver?.Toggles.TogglePrecision();
     }
 
     private static void ChangeHotbarSlot(ICoreClientAPI capi, int delta)

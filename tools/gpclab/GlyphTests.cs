@@ -78,6 +78,20 @@ internal static class GlyphTests
         // Start se perdería en silencio. Es el caso que ninguna de las cuatro
         // propuestas de arquitectura vio.
         Check("Escape es el keycode 50", (int)GlKeys.Escape == 50, $"{(int)GlKeys.Escape}");
+
+        // Los hints siguen al PRESET solo, porque salen de la acción efectiva
+        // y no de una tabla paralela. Si esto se desincroniza, el cartel del
+        // juego le dice al usuario que apriete un botón que no hace eso.
+        var (modern, _, _) = Build(GamepadLayoutKind.Modern);
+        Check("con el preset nuevo, C (personaje) = D-Right",
+              Key(modern, GlKeys.C) == "D-Right", Key(modern, GlKeys.C));
+        Check("con el clásico, C no la reclama ningún botón",
+              Key(resolver, GlKeys.C) is null, Key(resolver, GlKeys.C));
+        Check("sentarse sigue en D-Down con el preset nuevo",
+              Key(modern, GlKeys.G) == "D-Down", Key(modern, GlKeys.G));
+        Check("y los defaults que no se movieron tampoco cambian de glifo",
+              Key(modern, GlKeys.E) == "Y" && Key(modern, GlKeys.F) == "X",
+              Key(modern, GlKeys.E) + " / " + Key(modern, GlKeys.F));
     }
 
     private static void UserOverrides()
@@ -415,6 +429,7 @@ internal static class GlyphTests
         public Dictionary<string, HotKey> Hotkeys = new(StringComparer.OrdinalIgnoreCase);
         public ICoreClientAPI? Capi;
         public GamepadCompanionConfig? Config;
+        public GamepadLayoutKind LayoutKind = GamepadLayoutKind.Classic;
     }
 
     // Los bindings por default de vanilla que le importan al resolver.
@@ -433,9 +448,10 @@ internal static class GlyphTests
         ("characterdialog", GlKeys.C),
     };
 
-    private static (GlyphResolver, GamepadCompanionConfig, Context) Build()
+    private static (GlyphResolver, GamepadCompanionConfig, Context) Build(
+        GamepadLayoutKind layout = GamepadLayoutKind.Classic)
     {
-        var ctx = new Context();
+        var ctx = new Context { LayoutKind = layout };
         var config = new GamepadCompanionConfig();
 
         Dictionary<string, HotKey> hotkeys = ctx.Hotkeys;
@@ -474,6 +490,10 @@ internal static class GlyphTests
 
         ctx.Capi = capi;
         ctx.Config = config;
+        // Los defaults de los botones salen del LAYOUT, no de ButtonMapper:
+        // sin esto el resolver no reclama ninguna tecla para los botones sin
+        // binding y los hints de X/Y/Back/Start/D-pad se pierden en silencio.
+        ctx.Buttons.Layout = GamepadLayout.Build(ctx.LayoutKind, capi);
         var resolver = new GlyphResolver(capi, config, ctx.Provider,
                                          () => ctx.Buttons, () => ctx.Wheel);
         return (resolver, config, ctx);

@@ -53,10 +53,23 @@ public sealed class GamepadCompanionConfig
     public string? GlyphChannelsOff { get; set; } = null;
 
     // Override de la acción edge-press de un botón. Key = nombre del
-    // GamepadButton (A, B, DPadLeft, etc.). Una entry presente reemplaza
-    // el default hardcoded de ButtonMapper para ese botón. null/ausente
-    // = usar el default. LB (radial) y RB no son configurables, ver ButtonBindings.
+    // GamepadButton (A, B, DPadLeft, etc.). Una entry presente reemplaza el
+    // default del LAYOUT para ese botón; null/ausente = usar el default.
+    // El botón que el layout reserva para la rueda ignora las dos cosas.
     public Dictionary<string, SlotConfig?>? ButtonBindings { get; set; } = null;
+
+    // Preset de defaults de botones: "classic" (1.13 y anteriores) o "modern".
+    // STRING y no enum por el mismo motivo que GlyphStyle: LoadModConfig
+    // deserializa sin tolerancia y un valor desconocido tiraría DENTRO de
+    // StartClientSide, llevándose el mod entero. El parseo vive en
+    // Input/GamepadLayout.cs y cae en el default ante cualquier cosa rara.
+    //
+    // **null significa "todavía no lo eligió", y eso NO es lo mismo que el
+    // default.** Si ya había archivo de config, el mod se queda con el clásico
+    // —que es exactamente lo que el usuario tenía— y pregunta una vez; en una
+    // instalación nueva arranca con el nuevo y no pregunta nada. Ver
+    // GamepadCompanionModSystem.ResolveLayout.
+    public string? Layout { get; set; } = null;
 }
 
 // Representación serializable de un IGameAction. `Type` discrimina:

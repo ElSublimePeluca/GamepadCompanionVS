@@ -4,43 +4,64 @@ using Vintagestory.API.Client;
 
 namespace GamepadCompanion.Actions;
 
-// Map de GamepadButton → IGameAction? para overridear el comportamiento
-// edge-press de cada botón. Una entry null (o ausente) significa "usar
-// el default hardcoded de ButtonMapper" para ese botón.
+// Map de GamepadButton → IGameAction? con el override del USUARIO para el
+// comportamiento edge-press de cada botón. Una entry null (o ausente)
+// significa "usar el default del layout activo" (ver GamepadLayout).
+//
+// Las dos capas son a propósito: el layout dice qué hace un botón de fábrica y
+// el usuario puede taparlo botón por botón. Cambiar de layout cambia sólo la
+// capa de abajo, así que nunca borra lo que el usuario asignó.
 //
 // Botones excluidos a propósito:
-//   - LB: abre el radial.
-//   - RB: mantenido, hacía que el stick moviera el cursor virtual. Desde el
-//     issue #9 el stick lo mueve solo y RB no hace nada; queda afuera hasta
-//     decidir si pasa a ser asignable.
 //   - L3/R3: ToggleManager los usa incondicionalmente para Ctrl/Shift
 //     toggle; exponer override sería engañoso porque la binding del
 //     usuario se sumaría al toggle de Ctrl/Shift en vez de reemplazarlo.
-//   - DPad ↑ en gameplay: GamepadInputDriver lo usa para togglear modo
-//     precisión. Igual lo dejamos configurable porque la binding fires
-//     en paralelo sin pisarse (toggle es silencioso).
+//   - Guide: no lo reporta la mitad de los mandos y en Steam abre el overlay.
+//
+// LB y RB SÍ están: hasta 1.13 LB era la rueda y RB no hacía nada, así que
+// quedaban afuera. Ahora el botón de la rueda lo decide el layout, y el que le
+// toca queda reservado — `Layout.IsWheel` — en vez de estar excluido de la
+// lista, para que la fila se siga viendo y se entienda dónde está la rueda.
 public sealed class ButtonBindings
 {
-    // Orden estable para mostrar en UI. El comentario al lado describe
-    // el default actual; queda sincronizado con ButtonMapper.
+    // Orden estable para mostrar en UI. Los defaults de cada uno salen del
+    // layout, no de acá: ver GamepadLayout.Classic / .Modern.
     public static readonly GamepadButton[] Configurable =
     {
-        GamepadButton.A,           // jump (siempre activo) + acción extra; sin binding, clic en diálogos
-        GamepadButton.B,           // default: dismiss dialog o drop item
-        GamepadButton.X,           // default: toolmodeselect
-        GamepadButton.Y,           // default: inventorydialog
-        GamepadButton.Back,        // default: worldmapdialog
-        GamepadButton.Start,       // default: escapemenudialog
-        GamepadButton.DPadUp,      // default: nada (+ toggle precisión)
-        GamepadButton.DPadDown,    // default: tecla G (sentarse)
-        GamepadButton.DPadLeft,    // default: hotbar slot anterior
-        GamepadButton.DPadRight,   // default: hotbar slot siguiente
+        GamepadButton.A,           // salta siempre (MovementMapper); sin binding, clic en diálogos
+        GamepadButton.B,
+        GamepadButton.X,
+        GamepadButton.Y,
+        GamepadButton.LeftBumper,
+        GamepadButton.RightBumper,
+        GamepadButton.Back,
+        GamepadButton.Start,
+        GamepadButton.DPadUp,
+        GamepadButton.DPadDown,
+        GamepadButton.DPadLeft,
+        GamepadButton.DPadRight,
     };
 
     private readonly Dictionary<GamepadButton, IGameAction?> map = new();
 
+    // Layout activo, del que salen los defaults. Lo inyecta el ModSystem
+    // después de cargar la config (y lo reemplaza al cambiar de layout).
+    // Puede ser null en tests y en el instante entre construir y cablear: ahí
+    // Effective degrada al override y listo.
+    public GamepadLayout? Layout { get; set; }
+
+    // El override del usuario, sin el default. Es lo que se persiste y lo que
+    // muestra la tab Botones como "asignado".
     public IGameAction? this[GamepadButton btn] =>
         map.TryGetValue(btn, out var a) ? a : null;
+
+    // Lo que el botón hace DE VERDAD: override del usuario, o el default del
+    // layout. El botón de la rueda no hace ninguna de las dos.
+    public IGameAction? Effective(GamepadButton btn)
+    {
+        if (Layout is not null && Layout.IsWheel(btn)) return null;
+        return this[btn] ?? Layout?.Default(btn);
+    }
 
     public void Set(GamepadButton btn, IGameAction? action)
     {

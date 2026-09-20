@@ -52,12 +52,15 @@ public sealed class ConfigDialog : GuiDialog
     private const double SensResetGap   = 16;
     private const double SensResetH     = 32;
 
-    // Tab body: layout para "Botones". 12 filas a 28px = 336px que justo
-    // entra en el body disponible (DialogH - title - tabbar - footer - margins).
+    // Tab body: layout para "Botones". Una fila de layout arriba y 12 de
+    // botones (A/B/X/Y, los dos bumpers, Back/Start y el D-pad) a 28px = 336px,
+    // que entran en el body disponible (DialogH - title - tabbar - footer -
+    // margins = 435).
     private const double BtnRowH        = 26;
     private const double BtnRowGap      = 2;
     private const double BtnLabelW      = 100;
     private const double BtnPickerW     = 260;
+    private const double BtnLayoutGap   = 14;
 
     // Tab body: layout para "Ayudas". La columna de etiqueta es ancha a
     // propósito: AddStaticText no recorta, ENVUELVE, y una etiqueta que no entra
@@ -82,6 +85,9 @@ public sealed class ConfigDialog : GuiDialog
     // diálogo tiene que seguir funcionando igual.
     private readonly GlyphSession? glyphs;
     private readonly Action? onChanged;
+    // Cambiar de layout toca más cosas que el JSON (el botón de la rueda, los
+    // glifos), así que lo aplica el ModSystem y el diálogo sólo lo pide.
+    private readonly Action<GamepadLayoutKind>? onLayoutChanged;
 
     private int currentTab = TabWheel;
 
@@ -120,13 +126,15 @@ public sealed class ConfigDialog : GuiDialog
         ButtonBindings buttonBindings,
         GamepadCompanionConfig config,
         GlyphSession? glyphs = null,
-        Action? onChanged = null) : base(capi)
+        Action? onChanged = null,
+        Action<GamepadLayoutKind>? onLayoutChanged = null) : base(capi)
     {
         this.bindings = bindings;
         this.buttonBindings = buttonBindings;
         this.config = config;
         this.glyphs = glyphs;
         this.onChanged = onChanged;
+        this.onLayoutChanged = onLayoutChanged;
         BuildEntryList();
         Compose();
     }
@@ -320,27 +328,84 @@ public sealed class ConfigDialog : GuiDialog
     private void ComposeButtonsTab(GuiComposer compo, double startY)
     {
         double y = startY;
+
+        // Primero el preset: es el que decide qué dice "— por defecto —" en
+        // todas las filas de abajo, así que leerlo primero es lo que hace que
+        // el resto de la tab se entienda.
+        compo.AddStaticText(Lang.Get("gamepadcompanion:layout-label"),
+                            CairoFont.WhiteSmallText(),
+                            ElementBounds.Fixed(Margin, y + 4, BtnLabelW, BtnRowH));
+        compo.AddSmallButton(
+            GuiTextFit.EllipsizeButton(GamepadLayout.NameOf(CurrentLayoutKind), BtnPickerW),
+            () => { CycleLayout(); return true; },
+            ElementBounds.Fixed(Margin + BtnLabelW + 8, y, BtnPickerW, BtnRowH),
+            EnumButtonStyle.Normal);
+        y += BtnRowH + BtnLayoutGap;
+
         foreach (var btn in ButtonBindings.Configurable)
         {
             var thisBtn = btn;   // capture
             var labelBounds = ElementBounds
                 .Fixed(Margin, y + 4, BtnLabelW, BtnRowH);
-            var btnBounds = ElementBounds
+            var valueBounds = ElementBounds
                 .Fixed(Margin + BtnLabelW + 8, y, BtnPickerW, BtnRowH);
-
-            string current = GuiTextFit.EllipsizeButton(
-                buttonBindings[thisBtn]?.Label
-                    ?? Lang.Get("gamepadcompanion:button-default"),
-                BtnPickerW);
 
             compo.AddStaticText(ButtonDisplayName(thisBtn),
                                 CairoFont.WhiteSmallText(), labelBounds);
-            compo.AddSmallButton(current,
+
+            // El botón que el layout usa para la rueda no es asignable, pero la
+            // fila se muestra igual: es la única manera de ver DÓNDE quedó la
+            // rueda después de cambiar de preset. Texto y no botón, para que se
+            // lea como "acá no hay nada que elegir".
+            if (buttonBindings.Layout?.IsWheel(thisBtn) == true)
+            {
+                compo.AddStaticText(Lang.Get("gamepadcompanion:button-wheel"),
+                                    CairoFont.WhiteDetailText(),
+                                    ElementBounds.Fixed(valueBounds.fixedX, y + 5,
+                                                        BtnPickerW, BtnRowH));
+                y += BtnRowH + BtnRowGap;
+                continue;
+            }
+
+            compo.AddSmallButton(GuiTextFit.EllipsizeButton(ButtonValueLabel(thisBtn),
+                                                           BtnPickerW),
                                  () => { OpenButtonPicker(thisBtn); return true; },
-                                 btnBounds, EnumButtonStyle.Normal);
+                                 valueBounds, EnumButtonStyle.Normal);
 
             y += BtnRowH + BtnRowGap;
         }
+    }
+
+    private GamepadLayoutKind CurrentLayoutKind =>
+        buttonBindings.Layout?.Kind ?? GamepadLayout.Parse(config.Layout);
+
+    // Lo que dice la fila: el binding del usuario, o el default con el nombre
+    // de lo que hace. Decir sólo "— por defecto —" era justamente lo que no
+    // dejaba ver qué cambió al pasar de un layout al otro.
+    private string ButtonValueLabel(Input.GamepadButton btn)
+    {
+        if (buttonBindings[btn] is { } user) return user.Label;
+
+        string? label = buttonBindings.Layout?.Default(btn)?.Label;
+        return label is null
+            ? Lang.Get("gamepadcompanion:button-default")
+            : Lang.Get("gamepadcompanion:button-default-of", label);
+    }
+
+    private static readonly GamepadLayoutKind[] LayoutOrder =
+        { GamepadLayoutKind.Modern, GamepadLayoutKind.Classic };
+
+    // El botón cicla entre los presets en vez de abrir un picker: con dos
+    // opciones, una lista de un solo ítem (el picker esconde el índice 0, que
+    // usa como "quitar") no diría nada, y el efecto se ve solo — las 12 filas
+    // de abajo se recomponen mostrando el default nuevo de cada botón. Y es
+    // reversible con otro click, así que no hace falta confirmar.
+    private void CycleLayout()
+    {
+        int idx = Array.IndexOf(LayoutOrder, CurrentLayoutKind);
+        var next = LayoutOrder[(idx + 1) % LayoutOrder.Length];
+        onLayoutChanged?.Invoke(next);
+        Compose();
     }
 
     // Nombres en inglés cortos. Cairo no renderiza las flechas
@@ -352,6 +417,10 @@ public sealed class ConfigDialog : GuiDialog
             Input.GamepadButton.B          => "B",
             Input.GamepadButton.X          => "X",
             Input.GamepadButton.Y          => "Y",
+            // LB/RB y no "LeftBumper": es lo que dicen los glifos del mod y lo
+            // que está impreso en el mando.
+            Input.GamepadButton.LeftBumper  => "LB",
+            Input.GamepadButton.RightBumper => "RB",
             Input.GamepadButton.Back       => "Back / Select",
             Input.GamepadButton.Start      => "Start / Menu",
             Input.GamepadButton.DPadUp     => "DPad Up",

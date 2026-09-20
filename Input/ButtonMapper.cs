@@ -4,128 +4,117 @@ using Vintagestory.API.Common;
 
 namespace GamepadCompanion.Input;
 
-// Mapea los botones discretos del gamepad a hotkeys vanilla por edge-trigger.
-// D-pad ←/→ se mapean directo a InventoryManager.ActiveHotbarSlotNumber porque
-// el juego no expone una hotkey de "next/prev hotbar slot" (solo hotbarslot1..14).
+// Dispara por edge-press la acción de cada botón discreto del gamepad.
 //
-// B es contextual: cierra el GuiDialog abierto si hay alguno (chat, inventario,
-// pausa, manual, etc), sino dispara `dropitem`. Esto permite navegar dialogs
-// con el control sin tocar el teclado — particularmente importante para chat
-// (su input field captura Enter/Esc al teclado pero ningún botón de gamepad).
+// Qué acción es sale de DOS capas, en este orden (ButtonBindings):
+//   1. el override que el usuario asignó en la tab Botones, si hay;
+//   2. si no, el default del LAYOUT activo (GamepadLayout: Clásico o Nuevo).
+// El botón que el layout reserva para la rueda no hace ninguna de las dos.
 //
-// Cada acción edge-press puede ser overrideada por el usuario via ButtonBindings:
-// si Bindings[btn] != null, ejecutamos esa IGameAction en lugar del default.
-// El "jump mientras se mantiene A" queda unconditional (no se pierde aunque
-// remapees A a otra cosa).
+// El "jump mientras se mantiene A" NO pasa por acá: lo proyecta MovementMapper
+// junto con WASD, y queda unconditional (no se pierde aunque remapees A).
 public sealed class ButtonMapper
 {
-    // Default de DPad Down = press G. La tecla G en VS vanilla está
-    // bindeada al emote de sentarse (en mods/configs alternativos puede
-    // ser otra cosa, pero se queda en la convención del usuario).
-    // Propiedad para que el label se resuelva vía Lang en runtime, no en
-    // static init (que corre antes de que el Lang del mod esté cargado).
-    private static KeyPressAction SitDefault =>
-        new(SitDefaultKeyCode,
-            label: Vintagestory.API.Config.Lang.Get("gamepadcompanion:key-g-sit"));
-
-    // La tecla que aprieta ese default, como constante. El resolver de glifos la
-    // necesita para saber qué muestra D-Down, y construir la KeyPressAction sólo
-    // para leerle el KeyCode llamaría a Lang.Get en medio de la recomposición de
-    // una GUI.
-    internal const int SitDefaultKeyCode = (int)GlKeys.G;
-
-    // Fuente ÚNICA del código de hotkey por botón: la leen Apply (para
-    // dispararla) y el resolver de glifos (para saber qué mostrar). Si mañana X
-    // deja de ser toolmodeselect, el hint se entera solo.
-    //
-    // Los botones sin código de hotkey NO están acá a propósito: A dispara jump
-    // desde MovementMapper, B es contextual (cerrar diálogo o tirar ítem), D-Pad
-    // ←/→ ciclan slots del hotbar sin pasar por ninguna hotkey y D-Pad ↓ aprieta
-    // una tecla suelta (ver SitDefaultKeyCode).
-    internal static string? DefaultHotkeyCode(GamepadButton button) => button switch
-    {
-        GamepadButton.X     => "toolmodeselect",
-        GamepadButton.Y     => "inventorydialog",
-        GamepadButton.Back  => "worldmapdialog",
-        GamepadButton.Start => "escapemenudialog",
-        _                   => null,
-    };
+    // Repetición al mantener, para la navegación del hotbar (BuiltinAction
+    // .Repeats). Los números salen del comportamiento de un teclado: un retardo
+    // largo para que un toque no dispare dos, y después ~8 por segundo, que es
+    // cruzar los 10 slots en poco más de un segundo sin que se escape.
+    private const float RepeatDelay    = 0.40f;
+    private const float RepeatInterval = 0.12f;
 
     private readonly ICoreClientAPI capi;
-    private readonly HotkeyDispatcher hotkeys;
     private readonly VirtualCursor cursor;
+
+    // Cuánto falta para la próxima repetición, por botón. Sin entrada = el
+    // botón no está manteniendo nada repetible.
+    private readonly System.Collections.Generic.Dictionary<GamepadButton, float>
+        repeatIn = new();
 
     public ButtonBindings Bindings { get; set; } = ButtonBindings.BuildDefault();
 
-    public ButtonMapper(ICoreClientAPI capi, HotkeyDispatcher hotkeys,
-                        VirtualCursor cursor)
+    public ButtonMapper(ICoreClientAPI capi, VirtualCursor cursor)
     {
         this.capi = capi;
-        this.hotkeys = hotkeys;
         this.cursor = cursor;
     }
 
-    public void Apply(GamepadState current, GamepadState previous)
+    public void Apply(GamepadState current, GamepadState previous, float dt)
     {
         // Los holds NO se aplican acá: el driver llama a ApplyHolds antes de
         // la etapa de triggers para que un modificador y el click que lo usa
         // puedan salir en el mismo tick (ver comentario en ApplyHolds).
+        foreach (var btn in ButtonBindings.Configurable)
+        {
+            if (!current.WasPressed(btn, previous)) continue;
+            var action = EffectiveFor(btn);
+            // Los holdables ya los maneja ApplyHoldPresses — llamar Execute
+            // acá sería un tap extra en cada press.
+            if (action is IHoldableAction) continue;
+            action?.Execute(capi);
+        }
 
-        // A → jump se proyecta en MovementMapper junto con WASD, escribiendo a
-        // ClientMain.KeyboardState del hotkey "jump". Antes se seteaba acá el
-        // flag EntityControls.Jump: movía al jugador local pero nunca llegaba
-        // al servidor, así que el salto no se animaba para los demás. Sigue
-        // siendo unconditional (no se pierde aunque remapees A a otra cosa).
-
-        // Edge-press: cada botón ejecuta el override del user, o si no hay,
-        // su default hardcoded.
-        if (current.WasPressed(GamepadButton.A,         previous))
-            ExecuteOrDefault(GamepadButton.A,         null);
-        if (current.WasPressed(GamepadButton.B,         previous))
-            ExecuteOrDefault(GamepadButton.B,         DefaultB);
-        if (current.WasPressed(GamepadButton.X,         previous))
-            ExecuteOrDefault(GamepadButton.X,         () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.X)!));
-        if (current.WasPressed(GamepadButton.Y,         previous))
-            ExecuteOrDefault(GamepadButton.Y,         () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.Y)!));
-        if (current.WasPressed(GamepadButton.Back,      previous))
-            ExecuteOrDefault(GamepadButton.Back,      () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.Back)!));
-        if (current.WasPressed(GamepadButton.Start,     previous))
-            ExecuteOrDefault(GamepadButton.Start,     () => hotkeys.Trigger(DefaultHotkeyCode(GamepadButton.Start)!));
-        // DPad defaults se gatean en cursor.Visible: con el cursor virtual
-        // activo (dialog modal abierto), DPad navega UI en GamepadInputDriver
-        // (step del cursor, zoom del worldmap, etc) — no debe disparar el
-        // toggle de precisión, la tecla G, ni cambiar hotbar slot. Si el
-        // usuario tiene un override binding para DPad, lo respetamos igual.
-        if (current.WasPressed(GamepadButton.DPadUp,    previous))
-            ExecuteOrDefault(GamepadButton.DPadUp,    null);
-        if (current.WasPressed(GamepadButton.DPadDown,  previous))
-            ExecuteOrDefault(GamepadButton.DPadDown,
-                cursor.Visible ? null
-                               : (System.Action)(() => SitDefault.Execute(capi)));
-        if (current.WasPressed(GamepadButton.DPadLeft,  previous))
-            ExecuteOrDefault(GamepadButton.DPadLeft,
-                cursor.Visible ? null
-                               : (System.Action)(() => BuiltinActions.HotbarPrev(capi)));
-        if (current.WasPressed(GamepadButton.DPadRight, previous))
-            ExecuteOrDefault(GamepadButton.DPadRight,
-                cursor.Visible ? null
-                               : (System.Action)(() => BuiltinActions.HotbarNext(capi)));
+        ApplyRepeats(current, dt);
     }
 
-    // Si hay user binding, ejecutalo; si no, corré el default (puede ser
-    // null para botones sin default).
-    private void ExecuteOrDefault(GamepadButton btn, System.Action? defaultBehavior)
+    // Lo que este botón dispara AHORA, ya resuelto el contexto:
+    //
+    //   - El botón de la rueda no dispara nada: el hold ya significa abrirla.
+    //     Se chequea antes que el binding del usuario a propósito, así un
+    //     binding que quedó de otro layout queda dormido en vez de pelearse
+    //     con la rueda.
+    //   - Con el cursor virtual activo (diálogo modal abierto) el D-pad navega
+    //     la UI desde GamepadInputDriver — salta de slot, hace zoom en el mapa
+    //     — así que su DEFAULT no corre. Un binding explícito del usuario sí,
+    //     porque es una elección suya y no una convención del mod.
+    private IGameAction? EffectiveFor(GamepadButton btn)
     {
-        var userBinding = Bindings[btn];
-        if (userBinding is not null)
+        var layout = Bindings.Layout;
+        if (layout is not null && layout.IsWheel(btn)) return null;
+
+        var user = Bindings[btn];
+        if (user is not null) return user;
+
+        if (cursor.Visible && IsDPad(btn)) return null;
+        return layout?.Default(btn);
+    }
+
+    internal static bool IsDPad(GamepadButton btn) =>
+        btn is GamepadButton.DPadUp or GamepadButton.DPadDown
+            or GamepadButton.DPadLeft or GamepadButton.DPadRight;
+
+    // Mantener el botón repite la acción, para las que lo piden (hotbar).
+    // Pedido de pngwn: cruzar la barra con el bumper apretado en vez de doce
+    // toques, que es como se hacía con AntiMicro.
+    private void ApplyRepeats(GamepadState current, float dt)
+    {
+        foreach (var btn in ButtonBindings.Configurable)
         {
-            // Los holdables ya los maneja ApplyHolds — llamar Execute acá
-            // sería un tap extra en cada press.
-            if (userBinding is IHoldableAction) return;
-            userBinding.Execute(capi);
-            return;
+            var action = current.IsDown(btn) ? EffectiveFor(btn) : null;
+            if (action is not BuiltinAction { Repeats: true })
+            {
+                repeatIn.Remove(btn);
+                continue;
+            }
+
+            // Primer frame del hold: arranca el retardo inicial. El tap ya lo
+            // ejecutó el edge de Apply, así que acá no se dispara nada todavía.
+            if (!repeatIn.TryGetValue(btn, out float remaining))
+            {
+                repeatIn[btn] = RepeatDelay;
+                continue;
+            }
+
+            remaining -= dt;
+            // Cota: un frame largo (carga de chunks, alt-tab) puede acumular
+            // medio segundo, y escupir veinte slots de golpe es peor que
+            // perder repeticiones.
+            for (int i = 0; i < 4 && remaining <= 0f; i++)
+            {
+                action.Execute(capi);
+                remaining += RepeatInterval;
+            }
+            repeatIn[btn] = remaining > 0f ? remaining : RepeatInterval;
         }
-        defaultBehavior?.Invoke();
     }
 
     // Instancia que efectivamente apretamos por botón — no alcanza con mirar
@@ -156,6 +145,8 @@ public sealed class ButtonMapper
         {
             // Ya lo estamos manteniendo: el release lo decide la otra mitad.
             if (heldByButton.ContainsKey(btn)) continue;
+            // El botón de la rueda no ejecuta bindings (ver EffectiveFor).
+            if (Bindings.Layout?.IsWheel(btn) == true) continue;
             if (Bindings[btn] is not IHoldableAction binding) continue;
             if (!current.IsDown(btn) || previous.IsDown(btn)) continue;
 
@@ -204,6 +195,7 @@ public sealed class ButtonMapper
     // sin esto el edge de release se perdería y la tecla quedaría latcheada.
     public void ReleaseHolds()
     {
+        repeatIn.Clear();
         if (heldByButton.Count == 0) return;
         // Vaciar primero, soltar después: mismo motivo que en
         // ApplyHoldReleases — ReleaseHold sale al engine y una reentrada no
@@ -254,9 +246,4 @@ public sealed class ButtonMapper
             if (action.HeldKeyCode == keyCode) return true;
         return false;
     }
-
-    // DefaultB redirige al builtin "dropOrDismiss" — misma lógica que la
-    // BuiltinAction expuesta al picker, para mantener un solo punto de
-    // verdad del comportamiento.
-    private void DefaultB() => BuiltinActions.DropOrDismiss(capi);
 }

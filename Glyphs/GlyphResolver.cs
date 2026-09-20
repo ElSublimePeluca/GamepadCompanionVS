@@ -215,35 +215,21 @@ internal sealed class GlyphResolver
         Claim((int)GlKeys.LShift,   GamepadInput.StickRightPress, GlyphSource.Toggle, style, isToggle: true);
         Claim((int)GlKeys.LControl, GamepadInput.StickLeftPress,  GlyphSource.Toggle, style, isToggle: true);
 
-        // (3) BOTONES. El override del usuario le gana al default del mod, igual
-        //     que en ButtonMapper.ExecuteOrDefault.
+        // (3) BOTONES. Se pregunta por la acción EFECTIVA — override del usuario
+        //     sobre default del layout activo —, o sea exactamente lo que
+        //     ButtonMapper va a ejecutar. Así el hint sigue al layout solo: si
+        //     el usuario se pasa al clásico, el cartel vuelve a decir D-pad ←
+        //     donde decía LB. El botón que el layout reserva para la rueda
+        //     devuelve null y no reclama ninguna tecla.
         ButtonBindings buttons = buttonBindings();
         foreach (GamepadButton button in ButtonBindings.Configurable)
         {
             if (GlyphInputs.FromButton(button) is not GamepadInput input) continue;
 
-            switch (buttons[button])
-            {
-                case HotKeyAction hk:
-                    ClaimByHotkeyCode(hk.Code, input, GlyphSource.UserButton, style);
-                    break;
-                case KeyPressAction kp:
-                    Claim(kp.KeyCode, input, GlyphSource.UserButton, style);
-                    break;
-                case HoldKeyAction hd:
-                    Claim(hd.KeyCode, input, GlyphSource.UserButton, style);
-                    break;
-                // OpenLoadedGuiAction y BuiltinAction no tienen una tecla detrás;
-                // CompositeAction tiene varias y sería ambiguo. No inventamos.
-                case not null:
-                    break;
-                case null:
-                    if (ButtonMapper.DefaultHotkeyCode(button) is string code)
-                        ClaimByHotkeyCode(code, input, GlyphSource.DefaultButton, style);
-                    else if (button == GamepadButton.DPadDown)
-                        Claim(ButtonMapper.SitDefaultKeyCode, input, GlyphSource.DefaultButton, style);
-                    break;
-            }
+            GlyphSource source = buttons[button] is not null
+                ? GlyphSource.UserButton
+                : GlyphSource.DefaultButton;
+            ClaimAction(buttons.Effective(button), input, source, style);
         }
 
         // (4) A = saltar SIEMPRE, aunque A tenga override: MovementMapper lo
@@ -257,6 +243,33 @@ internal sealed class GlyphResolver
             SlotBindings wheel = wheelBindings();
             for (int slot = 0; slot < SlotBindings.SlotCount; slot++)
                 ClaimWheelSlot(wheel[slot], style);
+        }
+    }
+
+    // La tecla que hay detrás de una acción, cuando hay UNA sola y sin
+    // modificadores. OpenLoadedGuiAction no tiene ninguna; CompositeAction
+    // tiene varias y sería ambiguo; de los builtins el único con tecla propia
+    // es "sentarse", que aprieta la de `sitdown` (ver BuiltinActions.SitDown).
+    // Los demás builtins — hotbar, precisión, cerrar diálogo — son mecánicas
+    // del mod sin tecla vanilla detrás, así que no reclaman nada. En ninguno
+    // de esos casos inventamos.
+    private void ClaimAction(IGameAction? action, GamepadInput input,
+                             GlyphSource source, GlyphStyle style)
+    {
+        switch (action)
+        {
+            case HotKeyAction hk:
+                ClaimByHotkeyCode(hk.Code, input, source, style);
+                break;
+            case KeyPressAction kp:
+                Claim(kp.KeyCode, input, source, style);
+                break;
+            case HoldKeyAction hd:
+                Claim(hd.KeyCode, input, source, style);
+                break;
+            case BuiltinAction { Code: "sitDown" }:
+                ClaimByHotkeyCode("sitdown", input, source, style);
+                break;
         }
     }
 

@@ -12,7 +12,6 @@ public sealed class GamepadInputDriver
 {
     private readonly ICoreClientAPI capi;
     private readonly GamepadCompanionConfig config;
-    private readonly HotkeyDispatcher hotkeys;
     private readonly ButtonMapper buttons;
     private readonly MovementMapper movement;
     private readonly CameraMapper camera;
@@ -40,9 +39,8 @@ public sealed class GamepadInputDriver
     {
         this.capi = capi;
         this.config = config;
-        hotkeys = new HotkeyDispatcher(capi);
         cursor = new VirtualCursor(capi);
-        buttons = new ButtonMapper(capi, hotkeys, cursor);
+        buttons = new ButtonMapper(capi, cursor);
         movement = new MovementMapper(capi);
         camera = new CameraMapper(capi, config);
         triggers = new TriggerMapper(capi, buttons);
@@ -131,14 +129,24 @@ public sealed class GamepadInputDriver
         // poder navegar menús con el control en pausa.
         bool paused = capi.IsGamePaused;
 
+        bool vkbdOpen     = virtualKeyboard is not null && virtualKeyboard.IsOpened();
+        bool cursorActive = AnyModalDialogOpen();
+
         // El radial corre primero. Si está activo, los demás mappers (cámara,
         // botones, triggers, toggles) se saltan: el R stick selecciona slot,
         // B cancela. Movement sigue habilitado a propósito — caminar mientras
         // se elige slot es UX estándar.
-        radial.OnGamepadTick(current, previous);
-
-        bool vkbdOpen     = virtualKeyboard is not null && virtualKeyboard.IsOpened();
-        bool cursorActive = AnyModalDialogOpen();
+        //
+        // Con qué botón se abre lo decide el layout. Si ese botón es del D-pad
+        // (layout nuevo: D-pad ↑), no puede abrirse mientras la UI se está
+        // quedando con el D-pad — un diálogo abierto, donde ↑ mueve el cursor,
+        // o el teclado virtual, donde navega las teclas. Con LB (layout
+        // clásico) no hay conflicto y la rueda sigue abriéndose siempre.
+        // Ojo: el radial es un HudElement, así que NO cuenta en
+        // AnyModalDialogOpen() y calcular cursorActive antes es seguro.
+        bool wheelUsesDPad = ButtonMapper.IsDPad(radial.OpenButton);
+        radial.OnGamepadTick(current, previous,
+                             allowOpen: !(wheelUsesDPad && (cursorActive || vkbdOpen)));
 
         // Movement se proyecta SIEMPRE, aunque el resultado sea "ninguna tecla":
         // MovementMapper escribe a ClientMain.KeyboardState, que es persistente,
@@ -219,23 +227,19 @@ public sealed class GamepadInputDriver
         {
             cursor.Hide();
 
-            // DPad ↑ en gameplay togglea modo precisión. Hardcodeado acá
-            // (no pasa por ButtonMapper) porque no es una acción discreta
-            // sino un modificador continuo de la cámara — toggle stateful.
-            // El estado vive en ToggleManager para que ToggleHudOverlay lo
-            // muestre junto a CTRL/SHIFT en la esquina superior derecha.
-            if (current.WasPressed(GamepadButton.DPadUp, previous))
-            {
-                toggles.TogglePrecision();
-            }
-
+            // El toggle de precisión ya no está hardcodeado acá: es el builtin
+            // "precisionToggle" y lo dispara ButtonMapper desde el default del
+            // layout (D-pad ↑ en el clásico, D-pad ← en el nuevo), así que
+            // también se puede asignar a cualquier otro botón o a la rueda. El
+            // estado sigue viviendo en ToggleManager para que ToggleHudOverlay
+            // lo muestre junto a CTRL/SHIFT.
             float factor = toggles.PrecisionActive ? config.PrecisionFactor : 1f;
             camera.Apply(current, dt, factor);
             if (paused) triggers.Release();
             else triggers.Apply(current, previous);
         }
 
-        buttons.Apply(current, previous);
+        buttons.Apply(current, previous, dt);
         buttons.ApplyHoldReleases(current);
         toggles.OnTick(current, previous);
         // Ojo: la proyección a KeyboardState / ScreenManager NO va acá — va en

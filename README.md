@@ -10,7 +10,8 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 
 - **Movimiento y cámara** con sticks. Sensibilidad horizontal/vertical configurable, dead zone ajustable, opción de invertir pitch.
 - **Acciones contextuales**: B cierra el dialog abierto o suelta el item activo según contexto; A salta (siempre); X/Y/Back/Start mapeados a tool mode, inventario, mapa, menú.
-- **Rueda radial** de 12 slots configurables (LB + stick derecho). Defaults para Personaje, Chat, Manual, Configurar, Teclado virtual; el resto se asigna desde el dialog.
+- **Rueda radial** de 12 slots configurables (mantener LB o DPad ↑ según la disposición, + stick derecho). Defaults para Personaje, Chat, Manual, Configurar, Teclado virtual; el resto se asigna desde el dialog.
+- **Dos disposiciones de botones**, clásica (1.13) y nueva (1.14), intercambiables desde la tab Botones. Al actualizar se pregunta una vez; cambiarlas no pisa lo que hayas asignado a mano.
 - **Cursor virtual sobre GUIs**: cuando hay un dialog modal abierto aparece un cursor amarillo. El stick derecho lo mueve libre, como un mouse; el DPad lo hace saltar al slot, receta, pestaña o botón más cercano en esa dirección — pensado para navegar inventarios rápido. RT o A hacen clic izquierdo y LT clic derecho.
 - **Toggles de agacharse y correr** con L3/R3, indicador en HUD esquina superior derecha (si el minimapa está pinneado ahí, el indicador se acomoda justo debajo). Son las teclas Shift y Ctrl del juego, así que además de agacharse y correr sirven de modificador para los clicks: shift+click en inventario, ctrl+click para colocar, etc.
 - **Modo precisión** con DPad ↑: divide la sensibilidad de cámara por una fracción (default 0.3x) para apuntar bloques específicos.
@@ -97,23 +98,33 @@ Si tu controller solo aparece como gamepad cuando Steam Input lo emula (típico 
 
 ### Layout default de botones
 
-| Botón     | Acción default |
-|-----------|----------------|
-| A         | Saltar (hold) |
-| B         | Cerrar dialog si hay uno abierto, sino soltar item activo |
-| X         | Tool mode |
-| Y         | Inventario |
-| LB (hold) | Abrir radial menu |
-| RB        | Sin asignar |
-| RT        | Click izquierdo / atacar / minar |
-| LT        | Click derecho / interactuar / colocar |
-| Back      | Mapa |
-| Start     | Menú de pausa |
-| L3        | Toggle correr (Ctrl) |
-| R3        | Toggle agacharse (Shift) |
-| DPad ↑    | Toggle modo precisión |
-| DPad ↓    | Press G (sentarse) |
-| DPad ←/→  | Cambiar slot del hotbar |
+Hay dos **disposiciones** de botones, y la fila "Disposición" de la tab Botones cambia entre
+ellas en un click. Lo que el usuario haya asignado a mano queda por encima de las dos, así que
+cambiar de disposición nunca borra configuración.
+
+| Botón     | Nueva (1.14) | Clásica (1.13) |
+|-----------|--------------|----------------|
+| A         | Saltar (hold) | igual |
+| B         | Cerrar dialog si hay uno abierto, sino soltar item activo | igual |
+| X         | Tool mode | igual |
+| Y         | Inventario | igual |
+| LB        | Hotbar slot anterior (mantener = recorre) | **abrir la rueda** (hold) |
+| RB        | Hotbar slot siguiente (mantener = recorre) | sin asignar |
+| RT        | Click izquierdo / atacar / minar | igual |
+| LT        | Click derecho / interactuar / colocar | igual |
+| Back      | Mapa | igual |
+| Start     | Menú de pausa | igual |
+| L3        | Toggle correr (Ctrl) | igual |
+| R3        | Toggle agacharse (Shift) | igual |
+| DPad ↑    | **abrir la rueda** (hold) | Toggle modo precisión |
+| DPad ↓    | Sentarse (la tecla de `sitdown`, G por default) | igual |
+| DPad ←    | Toggle modo precisión | Hotbar slot anterior |
+| DPad →    | Personaje | Hotbar slot siguiente |
+
+Al actualizar desde 1.13 el mod **no** cambia nada solo: arranca con la clásica y pregunta una
+vez, al entrar al mundo, cuál preferís. Una instalación nueva arranca con la nueva y no pregunta.
+El botón que abre la rueda queda reservado: no ejecuta binding ni default, y la tab Botones
+muestra esa fila como "Rueda radial (mantener)" para que se vea dónde quedó.
 
 Con un dialog abierto aparece el cursor virtual y cambian dos cosas: el **stick derecho** mueve el
 cursor libre, como un mouse, y el **DPad** deja de hacer lo de la tabla y salta al slot, receta,
