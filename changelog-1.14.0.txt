@@ -1,0 +1,78 @@
+GamepadCompanion v1.14.0
+
+Two button layouts, and the old one is a choice instead of a loss
+
+  Suggested by pngwn: RB did nothing since 1.13.0, and the bumpers are where a
+  console player expects to run through the hotbar. Moving them means moving the
+  wheel and precision mode too, and that breaks the muscle memory of everyone
+  already playing — which is not a hypothetical. Someone wrote in about 1.13.0:
+  "the version i had last week was better (...) i have no clue how to get it
+  back to where its useable for me". So the old layout does not go away.
+
+  If you already had the mod installed, nothing changes on its own. The first
+  time you enter a world the mod asks, once, which layout you want, and until
+  you answer it keeps the one you had. You can answer it with the controller.
+  A fresh install starts on the new layout and is not asked anything.
+
+  Either way you can switch at any time: .gpconfig, Buttons tab, first row.
+  The rows below it now say what each default actually does — "default: Hotbar:
+  previous slot" instead of just "default" — so you can see what a layout
+  changes before you commit to it.
+
+                        New (1.14)                    Classic (1.13)
+    LB                  hotbar: previous slot         opens the wheel (hold)
+    RB                  hotbar: next slot             nothing
+    D-pad up            opens the wheel (hold)        precision mode
+    D-pad left          precision mode                hotbar: previous slot
+    D-pad right         character                     hotbar: next slot
+    D-pad down          sit down                      sit down
+
+  A, B, X, Y, Back and Start are the same in both, and so are the triggers, the
+  sticks and L3/R3.
+
+  Switching layouts cannot lose your configuration. A layout only supplies the
+  defaults; anything you assigned by hand in the Buttons tab sits on top of it
+  and survives, in both directions, however many times you switch. A binding
+  that lands on the button a layout uses for the wheel goes quiet rather than
+  being deleted, and comes back if you switch again.
+
+  The button the wheel uses is shown in the Buttons tab as "Radial menu (hold)"
+  instead of being hidden, so you can see where the wheel went.
+
+  On the new layout the wheel does not open while a menu is open or while the
+  virtual keyboard is up, because D-pad up is moving the cursor there. On the
+  classic layout LB has no such conflict and the wheel opens as it always did.
+
+New: hold a bumper to run through the hotbar
+
+  Also pngwn's, from how he used to play with an AntiMicro config: a tap moves
+  one slot, and holding keeps going after a short delay, about eight slots a
+  second. It follows the hotbar actions wherever they are, so it works on the
+  D-pad on the classic layout too.
+
+New: precision mode and sitting down can be assigned
+
+  Precision mode used to be welded to D-pad up and was the only thing in the mod
+  you could not move. It is now a regular action, so it can go on any button or
+  in the wheel.
+
+  "Sit down" was missing from the action list, which pngwn ran into while trying
+  to move it to the wheel and free up D-pad down. It was not an oversight so
+  much as a detail of the game: `sitdown` is a real, rebindable hotkey, but it
+  has no handler — the game compares the key code of the event instead — and the
+  list only offers hotkeys that can actually be triggered. The mod now sends the
+  key itself, read from your current binding, so if you moved sitting off G in
+  the game's settings the controller follows it. D-pad down does the same now,
+  where before it pressed a hardcoded G.
+
+Fixes
+
+- The character jumped when a menu closed under the A button. Pick a tool mode
+  with X, or a recipe while knapping, press A on it, and you would jump.
+
+  Those pickers close on the mouse *down*, not the release, so the menu was gone
+  while A was still held, and the next frame allowed jumping again with the
+  button already down. It appeared in 1.13.0, which is when A started clicking
+  in menus — before that there was no reason to be holding A when a dialog
+  closed. Jumping now needs a fresh press: holding A in the world still jumps as
+  it always did. Coming back from an alt-tab with A held no longer jumps either.
