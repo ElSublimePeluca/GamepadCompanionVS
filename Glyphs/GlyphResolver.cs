@@ -236,13 +236,19 @@ internal sealed class GlyphResolver
         //     proyecta aparte de ButtonMapper.
         ClaimByHotkeyCode("jump", GamepadInput.FaceSouth, GlyphSource.Movement, style);
 
-        // (5) RUEDA (LB + dirección). Se muestra "LB" a secas: el índice del slot
-        //     no lo ve el jugador en la rueda, así que "LB+3" no sería accionable.
+        // (5) RUEDA (botón de la rueda + dirección). Se muestra el botón a secas:
+        //     el índice del slot no lo ve el jugador en la rueda, así que "LB+3"
+        //     no sería accionable. El botón sale del layout, como los defaults de
+        //     (3): hasta 1.14.0 estaba fijo en LB, y en el preset nuevo LB cambia
+        //     de slot del hotbar.
         if (config.GlyphWheel)
         {
+            GamepadInput wheelInput =
+                GlyphInputs.FromButton(buttons.Layout?.Wheel ?? GamepadButton.LeftBumper)
+                ?? GamepadInput.ShoulderLeft;
             SlotBindings wheel = wheelBindings();
             for (int slot = 0; slot < SlotBindings.SlotCount; slot++)
-                ClaimWheelSlot(wheel[slot], style);
+                ClaimWheelSlot(wheel[slot], wheelInput, style);
         }
     }
 
@@ -291,18 +297,19 @@ internal sealed class GlyphResolver
         Claim(m.KeyCode, input, source, style);
     }
 
-    private void ClaimWheelSlot(IGameAction? action, GlyphStyle style)
+    private void ClaimWheelSlot(IGameAction? action, GamepadInput wheelInput,
+                                GlyphStyle style)
     {
         switch (action)
         {
             case HotKeyAction hk:
-                ClaimByHotkeyCode(hk.Code, GamepadInput.ShoulderLeft, GlyphSource.Wheel, style);
+                ClaimByHotkeyCode(hk.Code, wheelInput, GlyphSource.Wheel, style);
                 break;
             case KeyPressAction kp:
-                Claim(kp.KeyCode, GamepadInput.ShoulderLeft, GlyphSource.Wheel, style);
+                Claim(kp.KeyCode, wheelInput, GlyphSource.Wheel, style);
                 break;
             case HoldKeyAction hd:
-                Claim(hd.KeyCode, GamepadInput.ShoulderLeft, GlyphSource.Wheel, style);
+                Claim(hd.KeyCode, wheelInput, GlyphSource.Wheel, style);
                 break;
         }
     }

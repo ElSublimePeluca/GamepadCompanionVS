@@ -138,8 +138,8 @@ internal static class LayoutTests
     }
 
     // Sólo hace falta GetHotKeyByCode: GamepadLayout la usa para ponerle a cada
-    // default el nombre vivo de la hotkey.
-    private static ICoreClientAPI FakeApi()
+    // default el nombre vivo de la hotkey. La usan también MenuDPadTests.
+    internal static ICoreClientAPI FakeApi()
     {
         var input = DispatchProxy.Create<IInputAPI, Stub>();
         ((Stub)(object)input).Handler = (m, _) => m.Name == "GetHotKeyByCode"

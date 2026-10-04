@@ -10,11 +10,11 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 
 - **Movimiento y cámara** con sticks. Sensibilidad horizontal/vertical configurable, dead zone ajustable, opción de invertir pitch.
 - **Acciones contextuales**: B cierra el dialog abierto o suelta el item activo según contexto; A salta (siempre); X/Y/Back/Start mapeados a tool mode, inventario, mapa, menú.
-- **Rueda radial** de 12 slots configurables (mantener LB o DPad ↑ según la disposición, + stick derecho). Defaults para Personaje, Chat, Manual, Configurar, Teclado virtual; el resto se asigna desde el dialog.
+- **Rueda radial** de 12 slots configurables (mantener LB o DPad ↑ según la disposición, + stick derecho; también con un menú abierto). Defaults para Personaje, Chat, Manual, Configurar, Teclado virtual; el resto se asigna desde el dialog.
 - **Dos disposiciones de botones**, clásica (1.13) y nueva (1.14), intercambiables desde la tab Botones. Al actualizar se pregunta una vez; cambiarlas no pisa lo que hayas asignado a mano.
 - **Cursor virtual sobre GUIs**: cuando hay un dialog modal abierto aparece un cursor amarillo. El stick derecho lo mueve libre, como un mouse; el DPad lo hace saltar al slot, receta, pestaña o botón más cercano en esa dirección — pensado para navegar inventarios rápido. RT o A hacen clic izquierdo y LT clic derecho.
 - **Toggles de agacharse y correr** con L3/R3, indicador en HUD esquina superior derecha (si el minimapa está pinneado ahí, el indicador se acomoda justo debajo). Son las teclas Shift y Ctrl del juego, así que además de agacharse y correr sirven de modificador para los clicks: shift+click en inventario, ctrl+click para colocar, etc.
-- **Modo precisión** con DPad ↑: divide la sensibilidad de cámara por una fracción (default 0.3x) para apuntar bloques específicos.
+- **Modo precisión** con DPad ← (DPad ↑ en la clásica): divide la sensibilidad de cámara por una fracción (default 0.3x) para apuntar bloques específicos.
 - **Acciones compuestas**: una sola slot del radial puede ejecutar varias acciones en secuencia.
 - **Inyección de teclas individuales** (`KeyPressAction`): bindeás cualquier tecla del teclado a un slot/botón del gamepad. Útil para hotkeys que no aparecen en la lista vanilla.
 - **Teclado virtual on-screen** para tipear comandos y chat con el gamepad. QWERTY + `/` `.` para `/comandos`. DPad navega, A escribe, B cierra.
@@ -127,12 +127,20 @@ El botón que abre la rueda queda reservado: no ejecuta binding ni default, y la
 muestra esa fila como "Rueda radial (mantener)" para que se vea dónde quedó.
 
 Con un dialog abierto aparece el cursor virtual y cambian dos cosas: el **stick derecho** mueve el
-cursor libre, como un mouse, y el **DPad** deja de hacer lo de la tabla y salta al slot, receta,
-pestaña o botón más cercano en esa dirección. RT o A hacen clic izquierdo donde está el cursor (son
+cursor libre, como un mouse, y el **DPad** deja de hacer lo de la tabla —y también lo que le hayas
+asignado vos, porque ahí sólo navega— y salta al slot, receta, pestaña o botón más cercano en esa
+dirección. Una tecla que estabas manteniendo con el DPad desde antes de abrir el menú sigue apretada
+hasta que soltás el botón. RT o A hacen clic izquierdo donde está el cursor (son
 el mismo botón, así que apretar los dos no da dos clics) y LT hace clic derecho. Si le asignaste
 algo a A desde `.gpconfig`, A hace eso y el clic queda en RT. En el mapa a pantalla completa, DPad
 ↑/↓ hacen zoom. En los menús que no tienen slots ni botones del juego, como los hechos con ImGui (el
 de xSkills), el DPad mueve el cursor de a un paso y los clics también les llegan.
+
+La rueda también se abre con un menú abierto. En la clásica no cambia nada: LB. En la nueva, DPad ↑
+es a la vez la rueda y "subir" en el menú, así que ahí un toque mueve el cursor y **mantenerlo 0,4 s**
+abre la rueda. Sirve, por ejemplo, para abrir el inventario estando en un cofre, o el teclado virtual
+estando en el chat (el chat enfocado cuenta como menú). Con el teclado virtual abierto el DPad es
+todo del teclado y la rueda no se abre.
 
 Todo configurable desde `.gpconfig`.
 

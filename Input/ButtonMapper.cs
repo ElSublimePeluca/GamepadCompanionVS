@@ -23,7 +23,6 @@ public sealed class ButtonMapper
     private const float RepeatInterval = 0.12f;
 
     private readonly ICoreClientAPI capi;
-    private readonly VirtualCursor cursor;
 
     // Cuánto falta para la próxima repetición, por botón. Sin entrada = el
     // botón no está manteniendo nada repetible.
@@ -32,13 +31,17 @@ public sealed class ButtonMapper
 
     public ButtonBindings Bindings { get; set; } = ButtonBindings.BuildDefault();
 
-    public ButtonMapper(ICoreClientAPI capi, VirtualCursor cursor)
+    public ButtonMapper(ICoreClientAPI capi)
     {
         this.capi = capi;
-        this.cursor = cursor;
     }
 
-    public void Apply(GamepadState current, GamepadState previous, float dt)
+    // menuOpen: hay un diálogo modal abierto y el D-pad está moviendo el cursor
+    // virtual (ver Resolve). Lo pasa el driver en vez de leerlo del cursor
+    // porque ApplyHoldPresses corre ANTES de que el cursor se muestre o se
+    // esconda en ese tick, y ahí leería el estado del frame anterior.
+    public void Apply(GamepadState current, GamepadState previous, float dt,
+                      bool menuOpen)
     {
         // Los holds NO se aplican acá: el driver llama a ApplyHolds antes de
         // la etapa de triggers para que un modificador y el click que lo usa
@@ -46,14 +49,14 @@ public sealed class ButtonMapper
         foreach (var btn in ButtonBindings.Configurable)
         {
             if (!current.WasPressed(btn, previous)) continue;
-            var action = EffectiveFor(btn);
+            var action = Resolve(Bindings, btn, menuOpen);
             // Los holdables ya los maneja ApplyHoldPresses — llamar Execute
             // acá sería un tap extra en cada press.
             if (action is IHoldableAction) continue;
             action?.Execute(capi);
         }
 
-        ApplyRepeats(current, dt);
+        ApplyRepeats(current, dt, menuOpen);
     }
 
     // Lo que este botón dispara AHORA, ya resuelto el contexto:
@@ -62,20 +65,24 @@ public sealed class ButtonMapper
     //     Se chequea antes que el binding del usuario a propósito, así un
     //     binding que quedó de otro layout queda dormido en vez de pelearse
     //     con la rueda.
-    //   - Con el cursor virtual activo (diálogo modal abierto) el D-pad navega
-    //     la UI desde GamepadInputDriver — salta de slot, hace zoom en el mapa
-    //     — así que su DEFAULT no corre. Un binding explícito del usuario sí,
-    //     porque es una elección suya y no una convención del mod.
-    private IGameAction? EffectiveFor(GamepadButton btn)
+    //   - Con un menú abierto el D-pad es del cursor virtual — salta de slot,
+    //     hace zoom en el mapa — y no dispara NADA: ni el default ni lo que le
+    //     haya asignado el usuario. Hasta 1.14.0 el binding del usuario sí
+    //     corría ("es una elección suya"), pero el D-pad navegaba igual, así
+    //     que pasaban las dos cosas a la vez: con D-pad ↓ = mantener Z para
+    //     ZoomButton, bajar un slot en el inventario hacía zoom (reportado en
+    //     ModDB). No hay binding para el que eso sea lo que se quiere. Con A
+    //     es al revés (su binding le gana al clic) porque el clic sigue en RT;
+    //     la navegación del D-pad no tiene otro botón.
+    //
+    // Estática y pura para poder probarla sin el juego (gpclab selftest).
+    internal static IGameAction? Resolve(ButtonBindings bindings,
+                                         GamepadButton btn, bool menuOpen)
     {
-        var layout = Bindings.Layout;
+        var layout = bindings.Layout;
         if (layout is not null && layout.IsWheel(btn)) return null;
-
-        var user = Bindings[btn];
-        if (user is not null) return user;
-
-        if (cursor.Visible && IsDPad(btn)) return null;
-        return layout?.Default(btn);
+        if (menuOpen && IsDPad(btn)) return null;
+        return bindings[btn] ?? layout?.Default(btn);
     }
 
     internal static bool IsDPad(GamepadButton btn) =>
@@ -85,11 +92,11 @@ public sealed class ButtonMapper
     // Mantener el botón repite la acción, para las que lo piden (hotbar).
     // Pedido de pngwn: cruzar la barra con el bumper apretado en vez de doce
     // toques, que es como se hacía con AntiMicro.
-    private void ApplyRepeats(GamepadState current, float dt)
+    private void ApplyRepeats(GamepadState current, float dt, bool menuOpen)
     {
         foreach (var btn in ButtonBindings.Configurable)
         {
-            var action = current.IsDown(btn) ? EffectiveFor(btn) : null;
+            var action = current.IsDown(btn) ? Resolve(Bindings, btn, menuOpen) : null;
             if (action is not BuiltinAction { Repeats: true })
             {
                 repeatIn.Remove(btn);
@@ -139,15 +146,23 @@ public sealed class ButtonMapper
     //
     // Un tick que corta antes (radial, teclado virtual, foco perdido) llama a
     // ReleaseHolds() y no necesita ninguna de las dos.
-    public void ApplyHoldPresses(GamepadState current, GamepadState previous)
+    //
+    // El D-pad con un menú abierto no aprieta nada (ver Resolve), pero un hold
+    // que ya venía apretado de antes de abrir el menú sigue hasta que se suelte
+    // el botón: es lo que hace una tecla física que se mantiene mientras se abre
+    // el inventario, y la mitad del release no mira el menú a propósito.
+    public void ApplyHoldPresses(GamepadState current, GamepadState previous,
+                                 bool menuOpen)
     {
         foreach (var btn in ButtonBindings.Configurable)
         {
             // Ya lo estamos manteniendo: el release lo decide la otra mitad.
             if (heldByButton.ContainsKey(btn)) continue;
-            // El botón de la rueda no ejecuta bindings (ver EffectiveFor).
-            if (Bindings.Layout?.IsWheel(btn) == true) continue;
-            if (Bindings[btn] is not IHoldableAction binding) continue;
+            // El botón de la rueda y el D-pad en un menú no ejecutan nada. Los
+            // defaults nunca son holdables, así que esto sólo encuentra
+            // bindings del usuario.
+            if (Resolve(Bindings, btn, menuOpen) is not IHoldableAction binding)
+                continue;
             if (!current.IsDown(btn) || previous.IsDown(btn)) continue;
 
             // Registrar ANTES de apretar: Press pasa por el pipeline de

@@ -77,7 +77,14 @@ nadie ejercita a mano y que ya costaron bugs reales:
   valor desconocido en el JSON no lo deje en un layout inventado, y —lo que más importa— que
   cambiar de preset, en cualquier sentido, no le pise ni le borre un binding propio. Incluye
   que los glifos de los hints sigan al preset solos, porque salen de la acción efectiva y no
-  de una tabla paralela.
+  de una tabla paralela — también los de la rueda, que hasta 1.14.0 decían LB en el preset
+  nuevo, donde LB cambia de slot del hotbar.
+- **El DPad y la rueda con un menú abierto.** Con un menú abierto el DPad sólo mueve el
+  cursor: no corre su default ni lo que le haya asignado el usuario (un "mantener Z" en DPad ↓
+  hacía zoom al bajar por el inventario), sin cortar una tecla que venía apretada de antes. Y
+  la rueda del preset nuevo, que vive en DPad ↑: un toque es del cursor y mantenerlo 0,4 s la
+  abre, también si el menú se cierra en el medio de la espera, pero nunca con el teclado
+  virtual abierto ni desde un botón que ya venía apretado.
 - **El salto de A no se dispara al cerrarse un diálogo.** Varios diálogos del juego cierran en
   el MouseDOWN (`GuiDialogToolMode`, el selector de recetas del knapping), así que el frame
   siguiente encontraba A todavía apretada y con permiso de saltar: elegir un modo de

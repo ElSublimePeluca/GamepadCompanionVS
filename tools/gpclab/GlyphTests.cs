@@ -29,6 +29,7 @@ internal static class GlyphTests
         Console.WriteLine("\n  resolver de glifos");
         Triggers();
         TogglesAndButtons();
+        Wheel();
         UserOverrides();
         Collisions();
         Families();
@@ -92,6 +93,31 @@ internal static class GlyphTests
         Check("y los defaults que no se movieron tampoco cambian de glifo",
               Key(modern, GlKeys.E) == "Y" && Key(modern, GlKeys.F) == "X",
               Key(modern, GlKeys.E) + " / " + Key(modern, GlKeys.F));
+    }
+
+    // Las acciones de la rueda muestran el botón que la abre. Hasta 1.14.0 ese
+    // botón estaba fijo en LB, y en el preset nuevo LB es "hotbar: slot
+    // anterior": el manual decía "abrí con [LB]" y LB cambiaba de slot.
+    private static void Wheel()
+    {
+        var (classic, _, ctx) = Build();
+        ctx.Wheel.Set(2, new HotKeyAction("handbook", "manual"));
+        classic.Invalidate();
+        Check("clásico: una acción de la rueda muestra LB",
+              Key(classic, GlKeys.H) == "LB", Key(classic, GlKeys.H));
+
+        var (modern, _, ctx2) = Build(GamepadLayoutKind.Modern);
+        ctx2.Wheel.Set(2, new HotKeyAction("handbook", "manual"));
+        modern.Invalidate();
+        Check("nuevo: muestra D-Up, que es donde está la rueda",
+              Key(modern, GlKeys.H) == "D-Up", Key(modern, GlKeys.H));
+
+        // ApplyLayout invalida el mapa al cambiar de preset; el resolver tiene
+        // que leer el botón de la rueda fresco, no quedarse con el del arranque.
+        ctx.Buttons.Layout = GamepadLayout.Build(GamepadLayoutKind.Modern, ctx.Capi!);
+        classic.Invalidate();
+        Check("y se muda solo al cambiar de preset",
+              Key(classic, GlKeys.H) == "D-Up", Key(classic, GlKeys.H));
     }
 
     private static void UserOverrides()

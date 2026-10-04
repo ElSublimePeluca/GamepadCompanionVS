@@ -5,9 +5,26 @@ using Vintagestory.API.Client;
 
 namespace GamepadCompanion.Gui;
 
+// Cómo puede abrirse la rueda en este tick. Lo decide el driver con
+// RadialMenuDialog.OpeningFor, según el botón y lo que haya abierto.
+public enum WheelOpening
+{
+    // Al apretar el botón, que es lo de siempre: en el mundo, y en cualquier
+    // contexto cuando el botón no es del D-pad (LB en el clásico).
+    OnPress,
+    // Al MANTENERLO RadialMenuDialog.HoldToOpen segundos. Con un menú abierto
+    // y la rueda en el D-pad: el toque es del cursor, que salta al slot de
+    // arriba, y el hold es de la rueda.
+    OnHold,
+    // Nunca. Con el teclado virtual abierto y la rueda en el D-pad, el D-pad
+    // entero es del teclado.
+    Never,
+}
+
 // Rueda radial de 12 slots. Activación: mantener el botón que diga el layout
-// (LB en el clásico, D-pad ↑ en el nuevo). Selección: stick derecho (con dead
-// zone). Confirmación: soltar ese botón. Cancelación: B durante el hold.
+// (LB en el clásico, D-pad ↑ en el nuevo; con un menú abierto el D-pad pide un
+// hold de verdad, ver OpeningFor). Selección: stick derecho (con dead zone).
+// Confirmación: soltar ese botón. Cancelación: B durante el hold.
 //
 // Estado interno:
 //   - HighlightedSlot in [-1, 11]. -1 = stick en dead zone, sin selección activa.
@@ -15,8 +32,10 @@ namespace GamepadCompanion.Gui;
 //
 // Cuando el radial está abierto, GamepadInputDriver gatea los demás mappers
 // (cámara, botones, triggers, toggles) para evitar que el R stick mueva la
-// cámara o que B drop item al cancelar. Movement sigue habilitado a propósito
-// — convencional para que se pueda caminar mientras se abre la rueda.
+// cámara o que B drop item al cancelar — también en el tick en que se cierra,
+// que es justo el de B (ver wheelBusy en el driver). Movement sigue habilitado
+// a propósito — convencional para que se pueda caminar mientras se abre la
+// rueda.
 //
 // Layout: 12 posiciones a 30° de separación, los labels van más afuera para
 // dar espacio entre ellos (radius mayor + dialog más grande). SlotCount viene
@@ -29,6 +48,17 @@ public sealed class RadialMenuDialog : HudElement
     private const double  LabelW     = 96;
     private const double  LabelH     = 30;
     private const float   DeadZone   = 0.3f;
+
+    // Cuánto hay que mantener el botón para abrir la rueda cuando el toque es
+    // de otro (WheelOpening.OnHold). El mismo número que el retardo de
+    // repetición del hotbar (ButtonMapper.RepeatDelay), por la misma razón:
+    // más largo que cualquier toque, y lo bastante corto para no sentirse
+    // como una espera.
+    internal const float HoldToOpen = 0.40f;
+
+    // Cuánto lleva apretado el botón desde un flanco que todavía no abrió la
+    // rueda. null = no hay ninguna espera en curso.
+    private float? waited;
 
     private static readonly double[] ColorHighlighted = { 1.00, 0.84, 0.20, 1.00 };
     private static readonly double[] ColorIdle        = { 0.75, 0.75, 0.75, 0.85 };
@@ -58,27 +88,25 @@ public sealed class RadialMenuDialog : HudElement
         Compose();
     }
 
-    // allowOpen=false bloquea SÓLO la apertura, no la rueda ya abierta: cuando
-    // el botón de la rueda es del D-pad, la UI (un diálogo modal, el teclado
-    // virtual) se lo queda para navegar. Con la rueda abierta el driver ya
-    // cortó todo lo demás, así que ahí no hay conflicto que resolver.
+    // `opening` gobierna SÓLO la apertura, no la rueda ya abierta: con la
+    // rueda abierta el driver ya cortó todo lo demás, así que ahí no hay
+    // conflicto que resolver, sea cual sea el botón.
     public void OnGamepadTick(GamepadState current, GamepadState previous,
-                              bool allowOpen = true)
+                              float dt, WheelOpening opening)
     {
         bool holdNow  = current.IsDown(OpenButton);
         bool holdPrev = previous.IsDown(OpenButton);
         bool isOpen = IsOpened();
 
-        if (holdNow && !holdPrev && !isOpen)
+        if (!isOpen)
         {
-            if (!allowOpen) return;
+            (waited, bool open) = StepOpening(waited, holdNow, holdPrev, opening, dt);
+            if (!open) return;
             HighlightedSlot = -1;
             Compose();
             TryOpen();
             return;
         }
-
-        if (!isOpen) return;
 
         if (current.WasPressed(GamepadButton.B, previous))
         {
@@ -109,6 +137,51 @@ public sealed class RadialMenuDialog : HudElement
             if (action is not null)
                 capi.Event.RegisterCallback(_ => action.Execute(capi), 0);
         }
+    }
+
+    // Cómo se abre la rueda según dónde esté su botón y qué haya abierto.
+    //
+    // Con el botón en el D-pad (layout nuevo: ↑), un menú se lo queda para
+    // mover el cursor, y hasta 1.14.0 la rueda directamente no se abría ahí.
+    // Eso dejaba afuera más de lo que parecía: el chat enfocado cuenta como
+    // diálogo modal (HudDialogChat.DialogType), así que después de elegir Chat
+    // en la rueda no había cómo volver a abrirla para el teclado virtual, y
+    // con un cofre abierto no se podía abrir el inventario si estaba en la
+    // rueda (reportado en ModDB). Ahora el toque sigue siendo del cursor y
+    // mantenerlo abre la rueda.
+    //
+    // El teclado virtual se queda con el D-pad entero: ahí ↑ sube de fila y
+    // mantenerlo para llegar arriba es natural, así que un hold no puede
+    // significar otra cosa.
+    internal static WheelOpening OpeningFor(GamepadButton openButton,
+                                            bool menuOpen, bool keyboardOpen)
+    {
+        if (!ButtonMapper.IsDPad(openButton)) return WheelOpening.OnPress;
+        if (keyboardOpen) return WheelOpening.Never;
+        return menuOpen ? WheelOpening.OnHold : WheelOpening.OnPress;
+    }
+
+    // Un paso de la apertura: la espera nueva, y si hay que abrir en este tick.
+    // Estática y pura para poder probarla sin el juego (gpclab selftest).
+    //
+    // La rueda sólo sale de un FLANCO del botón, como siempre: un botón que ya
+    // venía apretado (por ejemplo desde el teclado virtual, o desde el hold que
+    // acaba de confirmar un slot) no la abre aunque cambie el contexto. Una
+    // espera en curso sí sobrevive a que el menú se cierre: el usuario la está
+    // manteniendo justamente para abrirla.
+    internal static (float? Waited, bool Open) StepOpening(
+        float? waited, bool down, bool wasDown, WheelOpening opening, float dt)
+    {
+        // Soltar el botón, o un contexto donde la rueda no puede abrirse,
+        // cancela la espera: después hace falta otro flanco.
+        if (!down || opening == WheelOpening.Never) return (null, false);
+
+        if (!wasDown)
+            return opening == WheelOpening.OnPress ? (null, true) : (0f, false);
+
+        if (waited is not float w) return (null, false);
+        w += dt;
+        return w >= HoldToOpen ? (null, true) : (w, false);
     }
 
     private static int ComputeSlot(float x, float y)

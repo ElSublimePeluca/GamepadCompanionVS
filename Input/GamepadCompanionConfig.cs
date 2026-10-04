@@ -44,8 +44,9 @@ public sealed class GamepadCompanionConfig
     public string GlyphStyle { get; set; } = "auto";
 
     // Si las acciones asignadas a la rueda radial también muestran glifo. Se
-    // muestra "LB" a secas (mantené LB, está en la rueda): el índice del slot
-    // no lo ve el jugador, así que "LB+3" no sería accionable.
+    // muestra el botón de la rueda a secas (LB en el clásico, D-pad ↑ en el
+    // nuevo: mantenelo, está en la rueda): el índice del slot no lo ve el
+    // jugador, así que "LB+3" no sería accionable.
     public bool GlyphWheel { get; set; } = true;
 
     // Canales de glifos apagados a mano, separados por coma: "icons,sign".

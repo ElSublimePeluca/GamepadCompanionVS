@@ -40,7 +40,7 @@ public sealed class GamepadInputDriver
         this.capi = capi;
         this.config = config;
         cursor = new VirtualCursor(capi);
-        buttons = new ButtonMapper(capi, cursor);
+        buttons = new ButtonMapper(capi);
         movement = new MovementMapper(capi);
         camera = new CameraMapper(capi, config);
         triggers = new TriggerMapper(capi, buttons);
@@ -137,16 +137,26 @@ public sealed class GamepadInputDriver
         // B cancela. Movement sigue habilitado a propósito — caminar mientras
         // se elige slot es UX estándar.
         //
-        // Con qué botón se abre lo decide el layout. Si ese botón es del D-pad
-        // (layout nuevo: D-pad ↑), no puede abrirse mientras la UI se está
-        // quedando con el D-pad — un diálogo abierto, donde ↑ mueve el cursor,
-        // o el teclado virtual, donde navega las teclas. Con LB (layout
-        // clásico) no hay conflicto y la rueda sigue abriéndose siempre.
+        // Con qué botón se abre lo decide el layout, y CÓMO lo decide
+        // RadialMenuDialog.OpeningFor. Si el botón es del D-pad (layout nuevo:
+        // ↑), con un diálogo abierto el toque mueve el cursor y mantenerlo abre
+        // la rueda, y con el teclado virtual abierto ↑ es del teclado y nada
+        // más. Con LB (layout clásico) no hay conflicto y la rueda se abre al
+        // apretar en todos lados.
         // Ojo: el radial es un HudElement, así que NO cuenta en
         // AnyModalDialogOpen() y calcular cursorActive antes es seguro.
-        bool wheelUsesDPad = ButtonMapper.IsDPad(radial.OpenButton);
-        radial.OnGamepadTick(current, previous,
-                             allowOpen: !(wheelUsesDPad && (cursorActive || vkbdOpen)));
+        //
+        // wheelBusy cuenta también el tick en que la rueda se CIERRA. TryClose
+        // cierra en el acto, así que cuando B la cancela IsActive ya es false,
+        // y hasta 1.14.0 ese tick seguía de largo hasta ButtonMapper con el
+        // flanco de B fresco. B es "soltar ítem o cerrar diálogo": cancelar la
+        // rueda tiraba lo que había en la mano, o cerraba el menú de abajo.
+        bool wheelWasOpen = radial.IsActive;
+        radial.OnGamepadTick(current, previous, dt,
+            RadialMenuDialog.OpeningFor(radial.OpenButton,
+                                        menuOpen: cursorActive,
+                                        keyboardOpen: vkbdOpen));
+        bool wheelBusy = wheelWasOpen || radial.IsActive;
 
         // Movement se proyecta SIEMPRE, aunque el resultado sea "ninguna tecla":
         // MovementMapper escribe a ClientMain.KeyboardState, que es persistente,
@@ -156,10 +166,10 @@ public sealed class GamepadInputDriver
         // cuando el engine no lo aceptaría igual (dialog abierto).
         movement.Apply(current,
                        allowMove: !paused && !vkbdOpen,
-                       allowJump: !paused && !vkbdOpen && !radial.IsActive
+                       allowJump: !paused && !vkbdOpen && !wheelBusy
                                   && !cursorActive);
 
-        if (radial.IsActive)
+        if (wheelBusy)
         {
             triggers.Release();
             buttons.ReleaseHolds();
@@ -184,7 +194,7 @@ public sealed class GamepadInputDriver
         // "mantener el modificador + gatillo" funcione aunque los dos edges
         // caigan en el mismo tick (el mod que lee el modificador lo lee en el
         // MouseDown). El release va después, ver ButtonMapper.ApplyHoldPresses.
-        buttons.ApplyHoldPresses(current, previous);
+        buttons.ApplyHoldPresses(current, previous, menuOpen: cursorActive);
 
         // Cursor virtual aparece SIEMPRE que hay un GuiDialog (modal) abierto.
         // Stick derecho: lo mueve libre, como un mouse. DPad: salta al slot,
@@ -239,7 +249,7 @@ public sealed class GamepadInputDriver
             else triggers.Apply(current, previous);
         }
 
-        buttons.Apply(current, previous, dt);
+        buttons.Apply(current, previous, dt, menuOpen: cursorActive);
         buttons.ApplyHoldReleases(current);
         toggles.OnTick(current, previous);
         // Ojo: la proyección a KeyboardState / ScreenManager NO va acá — va en
