@@ -1,5 +1,5 @@
 GamepadCompanion — descripción para la página de ModDB
-(en inglés, como la original; parte de la descripción anterior con lo de 1.14.0
+(en inglés, como la original; parte de la descripción anterior con lo de 1.15.0
 integrado. Los cambios respecto de la versión previa están listados al final de
 este archivo, después de la línea de corte, para que puedas revisarlos — esa
 parte NO va a la página.)
@@ -15,7 +15,7 @@ Full native gamepad support for Vintage Story 1.22+, designed as a client-side m
 - **The game's own key hints show your buttons.** Look at a chest and the help sign reads `[LT]: Open` instead of naming a mouse button; `Shift + right mouse` becomes `[RS*] + [LT]`. It covers the block help sign, the hint for the item in your hand, the survival handbook and item tooltips. Xbox, PlayStation and Nintendo icon sets, worked out automatically from the controller you plugged in or picked by hand. On PlayStation the four face buttons are drawn as the real symbols (✕ ○ □ △), as vector shapes with the same outline as the surrounding text, so they stay legible over the world, in a cave and on the handbook's parchment at any interface scale.
 - **Movement and camera** via sticks, with configurable sensitivity (horizontal/vertical), dead zone, and pitch inversion.
 - **Two button layouts**, and you pick. The current one puts hotbar navigation on the bumpers (hold one to run through it), the radial menu on D-Pad ↑ and precision mode on D-Pad ←; the classic one is the pre-1.14 arrangement, with the wheel on LB and the hotbar on D-Pad ←/→. If you already had the mod installed it keeps the classic one and asks you once, in game and answerable with the controller; you can switch whenever you like from the Buttons tab. A layout only supplies the defaults, so switching never touches anything you assigned by hand.
-- **12-slot radial menu** (hold LB or D-Pad ↑, depending on the layout, plus the right stick). Defaults to Character, Chat, Handbook, Settings, and Virtual Keyboard; the remaining slots are assignable from the in-game dialog.
+- **12-slot radial menu** (hold LB or D-Pad ↑, depending on the layout, plus the right stick). It opens over menus too; there, on the new layout, a tap of D-Pad ↑ moves the cursor and holding it opens the wheel. Defaults to Character, Chat, Handbook, Settings, and Virtual Keyboard; the remaining slots are assignable from the in-game dialog.
 - **Contextual button mapping**: B closes the open dialog or drops the active item depending on context; A jumps; X/Y/Back/Start mapped to tool mode, inventory, map, and pause menu.
 - **Virtual cursor over GUIs**: when a modal dialog is open, a yellow cursor appears. The right stick moves it freely, like a mouse; the DPad jumps it to the nearest slot, recipe, tab or button in that direction for fast inventory navigation. RT or A left-click (they count as one button), LT right-clicks.
 - **World map zoom with the D-Pad**: with the fullscreen map open, D-Pad ↑/↓ zooms in/out (one mouse-wheel notch per press) while ←/→ keeps moving the cursor for clicking waypoints.
@@ -85,16 +85,15 @@ The four PlayStation face symbols are drawn by the mod as vector shapes; no thir
 ================================================================================
 CAMBIOS RESPECTO DE LA DESCRIPCIÓN ANTERIOR (no va a la página)
 
-  1. Viñeta NUEVA arriba de la rueda: las dos disposiciones, que se elige una, que
-     al que ya tenía el mod se le pregunta y que cambiarla no pisa lo asignado a
-     mano. Es la única viñeta agregada.
-  2. La viñeta de la rueda decía "(LB + right stick)" a secas. Ahora aclara que el
-     botón depende de la disposición, porque en la nueva es D-Pad ↑.
-  3. La de modo precisión decía "(DPad Up)". Ahora dice dónde está en cada una y
-     que se puede mover, que es lo que cambió de verdad.
+  1. La viñeta de la rueda suma una frase: ahora también se abre sobre los
+     menús, y en la disposición nueva ahí hay que mantener D-Pad ↑ porque el
+     toque mueve el cursor. Es lo único que se agregó.
 
-  Nada más se tocó: compatibilidad, Steam Input, el disclaimer y los créditos
-  quedaron palabra por palabra como estaban.
+  Nada más se tocó, y ninguna frase había quedado falsa. Lo demás de 1.15.0 (el
+  D-pad que en un menú ya no ejecuta lo asignado, B que al cancelar la rueda
+  tiraba el ítem, el glifo LB de la rueda en la disposición nueva) la
+  descripción no lo mencionaba; va sólo en el changelog. Compatibilidad, Steam
+  Input, el disclaimer y los créditos quedaron palabra por palabra.
 
   Sigue para revisar, sin tocar (viene de la 1.13.1): el disclaimer dice "no
   `unsafe` blocks", pero el mod usa `unsafe` desde la primera versión (los

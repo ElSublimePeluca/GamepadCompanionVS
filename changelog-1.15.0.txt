@@ -1,0 +1,48 @@
+GamepadCompanion v1.15.0
+
+Menus: the D-pad only moves the cursor, even if you assigned something to it
+
+  Reported by pngwn: with D-pad down set to hold Z for the ZoomButton mod,
+  moving down through the inventory zoomed the camera in.
+
+  With a menu open, the D-pad moves the cursor from slot to slot. Its
+  defaults already stood aside there, but anything you had assigned to it
+  yourself kept running on top of the cursor move, so both happened at once.
+  There is no assignment for which that is what you want, so with a menu
+  open the D-pad now only moves the cursor, whatever you put on it. Outside
+  menus nothing changes.
+
+  If a D-pad button was already holding a key when the menu opened, the key
+  stays down until you let go of the button, like a keyboard key you keep
+  pressed while opening your inventory.
+
+New: the radial menu opens over menus on the new layout
+
+  Also pngwn's: with the inventory moved into the wheel to free up Y, there
+  was no way to open a chest and your inventory at the same time. On the new
+  layout the wheel lives on D-pad up, and with a menu open D-pad up moves the
+  cursor, so the wheel simply did not open there. The same thing got in the
+  way of chat: an open chat box counts as a menu, so after picking Chat from
+  the wheel you could not get back to it for the virtual keyboard.
+
+  Now, with a menu open, a tap of D-pad up still moves the cursor, and
+  holding it for 0.4 seconds opens the wheel (the press itself still moves
+  the cursor up one place first). Outside menus the wheel opens as soon as
+  you press the button, as before. While the virtual keyboard is up the
+  D-pad belongs to the keyboard, and the wheel stays closed. The classic
+  layout keeps the wheel on LB, which never had this conflict, so nothing
+  changes there.
+
+Fixes
+
+- Cancelling the wheel with B also dropped the item in your hand, or closed
+  the menu underneath it. The wheel closed on that press, but the same press
+  still reached B's own action, which is to drop the item or close the menu.
+  It had been there since the very first version, and now that the wheel
+  opens over menus it would have closed your chest every time you cancelled.
+
+- On the new layout, the game's hints showed LB for anything you put in the
+  wheel — the key that opens the handbook came out as [LB], for example —
+  and on that layout LB moves through the hotbar. They now show the button
+  that really opens the wheel: D-pad up on the new layout, LB on the classic
+  one.
