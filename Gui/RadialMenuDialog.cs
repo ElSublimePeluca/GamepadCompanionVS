@@ -60,6 +60,10 @@ public sealed class RadialMenuDialog : HudElement
     // rueda. null = no hay ninguna espera en curso.
     private float? waited;
 
+    // La acción del slot que se confirmó al soltar el botón, esperando al tick
+    // siguiente del driver (ver TakeConfirmed). null = nada pendiente.
+    private IGameAction? confirmed;
+
     private static readonly double[] ColorHighlighted = { 1.00, 0.84, 0.20, 1.00 };
     private static readonly double[] ColorIdle        = { 0.75, 0.75, 0.75, 0.85 };
 
@@ -124,19 +128,37 @@ public sealed class RadialMenuDialog : HudElement
 
         if (!holdNow && holdPrev)
         {
-            int confirmed = HighlightedSlot;
-            var action = confirmed >= 0 ? Bindings[confirmed] : null;
+            confirmed = HighlightedSlot >= 0 ? Bindings[HighlightedSlot] : null;
             TryClose();
-            // Diferimos al siguiente tick para que TryClose termine de procesar
-            // antes de invocar la acción. Sin esto, hotkeys como `chat` que
-            // dependen de pedir focus a un input field fallan: el engine ve la
-            // rueda todavía "abierta" durante el frame en que invocamos al
-            // handler y rechaza el focus request. Las hotkeys que solo abren
-            // un GuiDialog (characterdialog, handbook) funcionan igual con o
-            // sin el deferral.
-            if (action is not null)
-                capi.Event.RegisterCallback(_ => action.Execute(capi), 0);
         }
+    }
+
+    // La acción confirmada, para que el driver la ejecute al principio de su
+    // tick SIGUIENTE. Se entrega una sola vez: si ese tick no llega a
+    // ejecutarla (mando desconectado, ventana sin foco), se pierde en vez de
+    // dispararse sola minutos después, al volver.
+    //
+    // El frame de diferencia es a propósito: TryClose tiene que terminar antes
+    // de invocar la acción. Sin eso, hotkeys como `chat` que dependen de pedir
+    // focus a un input field fallan: el engine ve la rueda todavía "abierta"
+    // durante el frame en que invocamos al handler y rechaza el focus request.
+    // Las hotkeys que solo abren un GuiDialog (characterdialog, handbook)
+    // funcionan igual con o sin el diferido.
+    //
+    // Hasta 1.15.0 el diferido era capi.Event.RegisterCallback(…, 0), y eso
+    // NO corre con el juego pausado: ClientMain.MainRenderLoop sólo llama a
+    // TriggerGameTick, que es donde se despachan los callbacks, si !IsPaused.
+    // El manual pausa el single player al abrirse, así que elegir algo en la
+    // rueda con el manual abierto quedaba en espera hasta cerrarlo: el teclado
+    // virtual aparecía recién después de apretar B (reportado por pngwn en
+    // ModDB). Encima RegisterCallback en pausa loguea "Call to RegisterCallback
+    // while game is paused", y con developermode + extended debug info tira una
+    // excepción. El tick del driver corre en el render, pausa o no.
+    public IGameAction? TakeConfirmed()
+    {
+        var action = confirmed;
+        confirmed = null;
+        return action;
     }
 
     // Cómo se abre la rueda según dónde esté su botón y qué haya abierto.

@@ -8,7 +8,8 @@ using System.Text;
 namespace GamepadCompanion.Lab;
 
 // Vuelca por reflection la superficie de API del engine de la que dependen los glifos del
-// issue #8 y los destinos del cursor del issue #9, y la diffea contra un baseline commiteado.
+// issue #8, los destinos del cursor del issue #9 y el teclado virtual con el manual, y la
+// diffea contra un baseline commiteado.
 //
 // Para qué: el día que Vintage Story se actualiza, esto contesta en dos segundos si algún
 // seam cambió — antes de abrir el IDE, y no tres semanas después por un issue de alguien.
@@ -79,9 +80,11 @@ internal static class ApiCheck
         // --- Cursor virtual: de dónde salen los destinos del D-pad (issue #9). Los privados
         //     e internal los lee CursorTargets por reflection, y si desaparecen ese tipo de
         //     destino se apaga en silencio: es acá donde tiene que saltar.
-        ("Vintagestory.API.Client.GuiComposer", new[] { "interactiveElements", "Enabled" }),
+        ("Vintagestory.API.Client.GuiComposer", new[]
+            { "interactiveElements", "Enabled", "GetElement" }),
         ("Vintagestory.API.Client.GuiDialog", new[]
-            { "Composers", "DialogType", "IsOpened", "ShouldReceiveMouseEvents" }),
+            { "Composers", "DialogType", "IsOpened", "ShouldReceiveMouseEvents",
+              "SingleComposer", "ignoreNextKeyPress" }),
         ("Vintagestory.API.Client.GuiDialog+DlgComposers", new[] { "Values" }),
         ("Vintagestory.API.Client.GuiElementItemSlotGridBase", new[]
             { "SlotBounds", "unscaledSlotPadding" }),
@@ -101,6 +104,14 @@ internal static class ApiCheck
         ("Vintagestory.Client.NoObf.ClientPlatformWindows", new[] { "window" }),
         ("OpenTK.Windowing.Desktop.NativeWindow", new[] { "MouseState" }),
         ("OpenTK.Windowing.GraphicsLibraryFramework.MouseState", new[] { "_buttons" }),
+
+        // --- Teclado virtual con el manual. HandbookKeyboard reconoce el manual por el
+        //     NOMBRE de este tipo (el mod no referencia VSSurvivalMod.dll) y mira si el
+        //     composer que muestra tiene el "searchField" que arma initOverviewGui; el
+        //     composer recién se asigna en OnRenderGUI, y por eso decide un tick después.
+        //     SwallowedKeyPress apaga el ignoreNextKeyPress que el mando deja colgado.
+        //     Lo que usan de GuiDialog y GuiComposer está en sus entradas de arriba.
+        ("Vintagestory.GameContent.GuiDialogHandbook", new[] { "initOverviewGui", "OnRenderGUI" }),
     };
 
     public static int Run(string gameRoot, string[] args)
@@ -111,10 +122,12 @@ internal static class ApiCheck
         // OpenTK viene con el juego; el espejo de clicks para ImGui lee sus internals.
         var glfw = Assembly.LoadFrom(Path.Combine(gameRoot, "Lib", "OpenTK.Windowing.GraphicsLibraryFramework.dll"));
         var desktop = Assembly.LoadFrom(Path.Combine(gameRoot, "Lib", "OpenTK.Windowing.Desktop.dll"));
+        // El manual es de GameContent y vive en un mod del juego, no en la API.
+        var survival = Assembly.LoadFrom(Path.Combine(gameRoot, "Mods", "VSSurvivalMod.dll"));
 
         var lines = new List<string>();
         foreach (var (typeName, members) in Targets)
-            lines.AddRange(DumpType(typeName, members, api, lib, glfw, desktop));
+            lines.AddRange(DumpType(typeName, members, api, lib, glfw, desktop, survival));
         lines.AddRange(DumpValues(api, lib));
         lines.Sort(StringComparer.Ordinal);
 
@@ -149,15 +162,16 @@ internal static class ApiCheck
         foreach (string l in removed) Console.WriteLine("  - " + l);
         foreach (string l in added)   Console.WriteLine("  + " + l);
         Console.WriteLine(
-            "\n  Revisá qué toca cada cambio (un canal de glifos en GlyphPatcher, o un tipo de\n" +
-            "  destino del D-pad en CursorTargets), ajustá el código si hace falta, y actualizá\n" +
-            "  el baseline en el MISMO commit:\n" +
+            "\n  Revisá qué toca cada cambio (un canal de glifos en GlyphPatcher, un tipo de\n" +
+            "  destino del D-pad en CursorTargets, o el manual en HandbookKeyboard), ajustá el\n" +
+            "  código si hace falta, y actualizá el baseline en el MISMO commit:\n" +
             "      dotnet run --project tools/gpclab -- apicheck --update");
         return 1;
     }
 
     private static string Header(Assembly api, Assembly lib) =>
-        "# gpclab apicheck — superficie de API del engine de la que dependen los glifos y el cursor.\n" +
+        "# gpclab apicheck — superficie de API del engine de la que dependen los glifos, el cursor y\n" +
+        "# el teclado virtual.\n" +
         "# Generado con `dotnet run --project tools/gpclab -- apicheck --update`. No editar a mano.\n" +
         $"# Tomado contra VintagestoryAPI {api.GetName().Version} / VintagestoryLib {lib.GetName().Version}.\n" +
         "# La versión del juego NO va en las líneas comparadas a propósito: un update que no\n" +

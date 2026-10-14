@@ -247,6 +247,7 @@ internal static class Measure
             ("hints-toggle-note", true, dialogInner),
             // De referencia: las etiquetas de la tab Sensibilidad, que ya existían.
             ("sens-swap-triggers", false, sensLabelW),
+            ("sens-keyboard-handbook", false, sensLabelW),
             ("sens-invert-pitch", false, sensLabelW),
             ("sens-yaw", false, sensLabelW),
             ("sens-pitch", false, sensLabelW),

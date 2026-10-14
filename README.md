@@ -17,7 +17,7 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 - **Modo precisión** con DPad ← (DPad ↑ en la clásica): divide la sensibilidad de cámara por una fracción (default 0.3x) para apuntar bloques específicos.
 - **Acciones compuestas**: una sola slot del radial puede ejecutar varias acciones en secuencia.
 - **Inyección de teclas individuales** (`KeyPressAction`): bindeás cualquier tecla del teclado a un slot/botón del gamepad. Útil para hotkeys que no aparecen en la lista vanilla.
-- **Teclado virtual on-screen** para tipear comandos y chat con el gamepad. QWERTY + `/` `.` para `/comandos`. DPad navega, A escribe, B cierra.
+- **Teclado virtual on-screen** para tipear comandos y chat con el gamepad. QWERTY + `/` `.` para `/comandos`. DPad navega, A escribe, B cierra. Se abre solo cuando abrís el manual desde el mando en la página de búsqueda, y se cierra con él (se apaga en la tab Sensibilidad).
 - **Íconos del mando en las ayudas del juego**: el cartel que aparece al mirar un bloque, el hint del ítem en mano, el manual y los tooltips muestran el botón del mando en vez de la tecla o el ícono de mouse. Se elige el estilo (Xbox / PlayStation / Nintendo) o se deja en automático, que lo deduce del mando conectado. Ver [Íconos en las ayudas](#íconos-en-las-ayudas).
 - **Editor in-game** (`.gpconfig` o tecla Insert por default): tabs para Rueda, Botones del gamepad, Sensibilidad y Ayudas. Persistencia automática a JSON.
 
@@ -42,7 +42,7 @@ Soporte nativo de gamepad para [Vintage Story](https://www.vintagestory.at/) 1.2
 El mod bypassea la "gamepad mapping" de GLFW (la SDL DB) y lee el joystick raw, detectando automáticamente uno de tres layouts en el primer poll:
 
 - **Xpad** (default): XInput / Xbox controllers en Linux y Windows. Axes en orden LX,LY,LT,RX,RY,RT; botones A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3.
-- **DS4-DirectInput**: PS4 y compatibles en Windows (DirectInput). Firma: triggers signed en axes 3/4 (reposo = -1). Axes en orden LX,LY,RX,LT,RT,RY; face buttons Square,Cross,Circle,Triangle.
+- **DS4-DirectInput**: PS4 y compatibles en Windows (DirectInput), incluido el DualShock 4 de Sony. Firma: triggers signed en axes 3/4 (reposo = -1). Axes en orden LX,LY,RX,LT,RT,RY; face buttons Square,Cross,Circle,Triangle; L3, R3 y PS en raw 10/11/12 (el orden del descriptor del DS4, el mismo que usa SDL).
 - **GameSir-PS4**: GameSir Cyclone 2 (y probablemente otros del mismo fabricante) en modo PS4. Detectado por nombre del dispositivo ("Chicken Run" o "GameSir"). Axes en orden xpad estándar pero con triggers signed; face buttons X y Y intercambiados en raw 2/3.
 
 En los layouts PS4 el mod ignora los raw buttons 6/7 (L2/R2 como botón digital) para evitar acciones fantasma cuando se aprietan los triggers analógicos.
@@ -53,7 +53,8 @@ En los layouts PS4 el mod ignora los raw buttons 6/7 (L2/R2 como botón digital)
 | GameSir Cyclone 2 (modo PS4)  | ✅ Probado (Linux) |
 | Xbox 360 / One / Series | ✅ Layout xpad — debería funcionar |
 | PS4-like genérico DirectInput (Wired Controller, etc.) | ✅ Detectado por firma de triggers signed |
-| DualShock 4 / DualSense oficiales | ⚠️ Depende del driver — algunos firmwares caen en una de las heurísticas, otros no |
+| DualShock 4 oficial en Windows | ✅ Cae en DS4-DirectInput (visto en un reporte con un DS4 v2) |
+| DualSense / DualShock 4 oficiales en otros setups | ⚠️ Depende del driver — algunos firmwares caen en una de las heurísticas, otros no |
 | Switch Pro Controller | ⚠️ Depende del modo |
 | Joysticks vintage / no-xpad / no-PS4 | ❌ Layout desconocido, mapeos van a salir mal |
 

@@ -83,10 +83,11 @@ public sealed class HoldKeyAction : IGameAction, IHoldableAction
     }
 
     // Fallback para consumidores que solo saben ejecutar una vez (la rueda
-    // radial): tap, igual que KeyPressAction. Corre un frame después y FUERA
-    // del OnTick del driver (RadialMenuDialog lo difiere con RegisterCallback),
-    // así que el `finally` que reproyecta el espejo no lo cubre — por eso el
-    // release del espejo va en un finally propio.
+    // radial): tap, igual que KeyPressAction. La rueda hoy la corre adentro del
+    // OnTick del driver (al principio del tick siguiente), pero hasta 1.15.0 la
+    // difería con RegisterCallback, FUERA de ese tick y de su `finally` que
+    // reproyecta el espejo. El release del espejo va en un finally propio para
+    // que el tap no dependa de quién lo llame.
     public void Execute(ICoreClientAPI capi)
     {
         if (capi.World is not ClientMain cm) return;

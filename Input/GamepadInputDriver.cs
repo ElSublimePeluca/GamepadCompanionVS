@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using GamepadCompanion.Gui;
 using GamepadCompanion.Toggles;
@@ -35,6 +36,13 @@ public sealed class GamepadInputDriver
     public VirtualKeyboardDialog VirtualKeyboard =>
         virtualKeyboard ??= new VirtualKeyboardDialog(capi);
 
+    // El teclado virtual que se abre solo con el manual (ver HandbookKeyboard).
+    private readonly HandbookKeyboard handbookKeyboard;
+
+    // Los diálogos que ya tenían ignoreNextKeyPress al empezar el tick (ver
+    // SwallowedKeyPress). Se reusa entre ticks para no alocar por frame.
+    private readonly HashSet<GuiDialog> flaggedBeforeTick = new();
+
     public GamepadInputDriver(ICoreClientAPI capi, GamepadCompanionConfig config)
     {
         this.capi = capi;
@@ -49,6 +57,7 @@ public sealed class GamepadInputDriver
         cursorClicks = new CursorClickMapper(capi, cursor, buttons);
         cursorNavigator = new CursorNavigator(capi, cursor);
         worldMapZoom = new WorldMapZoomMapper(capi);
+        handbookKeyboard = new HandbookKeyboard(capi, () => VirtualKeyboard);
     }
 
     // El tick real está en OnTickCore. Este wrapper existe por una sola razón:
@@ -67,6 +76,13 @@ public sealed class GamepadInputDriver
         bool injecting = current.IsConnected && IsWindowFocused();
         // Lo vuelve a prender CursorClickMapper.Apply si hay cursor este tick.
         cursorClicks.ClearHeld();
+        // Dos fotos de "antes": qué diálogos ya tenían ignoreNextKeyPress, y si
+        // el manual ya estaba abierto. Los eventos físicos llegan ENTRE ticks,
+        // así que lo que cambie de acá al `finally` lo hizo el mando (ver
+        // SwallowedKeyPress y HandbookKeyboard).
+        if (injecting)
+            SwallowedKeyPress.Snapshot(capi.Gui.LoadedGuis, flaggedBeforeTick);
+        handbookKeyboard.BeginTick(injecting);
         try
         {
             OnTickCore(current, previous, dt, injecting);
@@ -78,12 +94,20 @@ public sealed class GamepadInputDriver
             ScreenInputMirror.Commit(toggles, triggers, buttons, injecting);
             NativeMouseMirror.Commit(injecting && cursorClicks.LeftHeld,
                                      injecting && cursorClicks.RightHeld);
+            if (injecting)
+                SwallowedKeyPress.ForgetNew(capi.Gui.LoadedGuis, flaggedBeforeTick);
+            handbookKeyboard.EndTick(injecting, config.KeyboardWithHandbook);
         }
     }
 
     private void OnTickCore(GamepadState current, GamepadState previous,
                             float dt, bool injecting)
     {
+        // Lo que se eligió en la rueda en el tick anterior. Se retira antes de
+        // los early returns: un tick sin mando o sin foco lo descarta, en vez
+        // de dejarlo esperando para dispararlo solo al volver.
+        var confirmed = radial.TakeConfirmed();
+
         if (!current.IsConnected)
         {
             movement.Release();
@@ -128,6 +152,14 @@ public sealed class GamepadInputDriver
         // mundo, así que se gatean; cursor/radial/cámara siguen activos para
         // poder navegar menús con el control en pausa.
         bool paused = capi.IsGamePaused;
+
+        // La acción de la rueda va ANTES de mirar qué hay abierto, así el resto
+        // de este tick ya ve lo que abrió (el teclado virtual, un diálogo). Y
+        // corre también en pausa, a diferencia de movement y triggers: es una
+        // elección explícita, como un botón con su binding, y con el manual
+        // abierto en single player el juego está pausado justo cuando se pide
+        // el teclado (ver RadialMenuDialog.TakeConfirmed).
+        confirmed?.Execute(capi);
 
         bool vkbdOpen     = virtualKeyboard is not null && virtualKeyboard.IsOpened();
         bool cursorActive = AnyModalDialogOpen();

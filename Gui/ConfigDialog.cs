@@ -14,7 +14,8 @@ namespace GamepadCompanion.Gui;
 // Editor de configuración del mod. Cuatro tabs:
 //   - Rueda:        editor de los 12 slots del radial.
 //   - Botones:      override de la acción de cada botón.
-//   - Sensibilidad: dead zone, sensibilidad de cámara, invertir pitch.
+//   - Sensibilidad: dead zone, sensibilidad de cámara, invertir pitch, y las
+//                   opciones generales (gatillos, teclado con el manual).
 //   - Ayudas:       familia de glifos de los hints del juego, con vista previa.
 // onChanged se invoca tras cualquier cambio (slot o sensibilidad). El
 // ModSystem lo cablea con StoreModConfig para persistir en JSON.
@@ -697,35 +698,19 @@ public sealed class ConfigDialog : GuiDialog
             (int)(config.Deadzone * 100), 0, 50, 1, "%",
             v => { config.Deadzone = v / 100f; onChanged?.Invoke(); return true; });
 
-        // Invert pitch (switch)
-        var labelBounds = ElementBounds
-            .Fixed(Margin, y + 6, SensLabelW, SensRowH);
-        var switchBounds = ElementBounds
-            .Fixed(Margin + SensLabelW + 8, y, 30, 30);
-        compo.AddStaticText(Lang.Get("gamepadcompanion:sens-invert-pitch"),
-                            CairoFont.WhiteSmallText(), labelBounds);
-        compo.AddSwitch(v =>
-            {
-                config.InvertPitch = v;
-                onChanged?.Invoke();
-            },
-            switchBounds, "invert");
-        y += SensRowH + SensRowGap;
+        AddSensitivitySwitch(compo, ref y,
+            Lang.Get("gamepadcompanion:sens-invert-pitch"), "invert",
+            v => config.InvertPitch = v);
 
-        // Swap triggers (switch)
-        var swapLabelBounds = ElementBounds
-            .Fixed(Margin, y + 6, SensLabelW, SensRowH);
-        var swapSwitchBounds = ElementBounds
-            .Fixed(Margin + SensLabelW + 8, y, 30, 30);
-        compo.AddStaticText(Lang.Get("gamepadcompanion:sens-swap-triggers"),
-                            CairoFont.WhiteSmallText(), swapLabelBounds);
-        compo.AddSwitch(v =>
-            {
-                config.SwapTriggers = v;
-                onChanged?.Invoke();
-            },
-            swapSwitchBounds, "swaptriggers");
-        y += SensRowH + SensRowGap;
+        AddSensitivitySwitch(compo, ref y,
+            Lang.Get("gamepadcompanion:sens-swap-triggers"), "swaptriggers",
+            v => config.SwapTriggers = v);
+
+        // No es de sensibilidad, pero esta tab es la de las opciones generales
+        // (ya tenía el intercambio de gatillos) y es la única con lugar.
+        AddSensitivitySwitch(compo, ref y,
+            Lang.Get("gamepadcompanion:sens-keyboard-handbook"), "keyboardhandbook",
+            v => config.KeyboardWithHandbook = v);
 
         // Volver a los valores de fábrica de esta tab. Los sliders van de
         // 100 a 5000 y es fácil dejarlos en un valor injugable sin saber
@@ -750,6 +735,7 @@ public sealed class ConfigDialog : GuiDialog
         config.Deadzone         = defaults.Deadzone;
         config.InvertPitch      = defaults.InvertPitch;
         config.SwapTriggers     = defaults.SwapTriggers;
+        config.KeyboardWithHandbook = defaults.KeyboardWithHandbook;
         config.PrecisionFactor  = defaults.PrecisionFactor;
         onChanged?.Invoke();
         Compose();
@@ -769,6 +755,25 @@ public sealed class ConfigDialog : GuiDialog
 
         compo.AddStaticText(label, CairoFont.WhiteSmallText(), labelBounds);
         compo.AddSlider(onNewValue, sliderBounds, key);
+        y += SensRowH + SensRowGap;
+    }
+
+    private void AddSensitivitySwitch(
+        GuiComposer compo, ref double y,
+        string label, string key, Action<bool> setValue)
+    {
+        var labelBounds = ElementBounds
+            .Fixed(Margin, y + 6, SensLabelW, SensRowH);
+        var switchBounds = ElementBounds
+            .Fixed(Margin + SensLabelW + 8, y, 30, 30);
+
+        compo.AddStaticText(label, CairoFont.WhiteSmallText(), labelBounds);
+        compo.AddSwitch(v =>
+            {
+                setValue(v);
+                onChanged?.Invoke();
+            },
+            switchBounds, key);
         y += SensRowH + SensRowGap;
     }
 
@@ -796,6 +801,7 @@ public sealed class ConfigDialog : GuiDialog
             .SetValues((int)(config.Deadzone * 100), 0, 50, 1, "%");
         SingleComposer.GetSwitch("invert").SetValue(config.InvertPitch);
         SingleComposer.GetSwitch("swaptriggers").SetValue(config.SwapTriggers);
+        SingleComposer.GetSwitch("keyboardhandbook").SetValue(config.KeyboardWithHandbook);
     }
 
     private void OnTabClicked(int idx)

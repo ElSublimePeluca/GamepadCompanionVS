@@ -36,8 +36,9 @@ dotnet run --project tools/gpclab -- render [salida.png]
 Vuelca por reflection las firmas del engine de las que dependen los glifos (los seams de
 Harmony, los campos que se leen, los valores de los que salen las cuentas de píxeles) y el
 cursor virtual (los privados de los que salen los destinos del D-pad, y el campo de OpenTK
-del que ImGui toma los clics), y las compara contra `apisurface.baseline.txt`, que está
-commiteado. Sale con código ≠ 0 si algo cambió.
+del que ImGui toma los clics), más el tipo `GuiDialogHandbook` que el mod reconoce por nombre
+para abrir el teclado virtual con el manual, y las compara contra `apisurface.baseline.txt`,
+que está commiteado. Sale con código ≠ 0 si algo cambió.
 
 **Correlo el día que actualizás el juego, antes de abrir el IDE.** Si algo cambió, es un
 error el día correcto en vez de un issue de un usuario tres semanas después. Cuando el
@@ -90,6 +91,15 @@ nadie ejercita a mano y que ya costaron bugs reales:
   siguiente encontraba A todavía apretada y con permiso de saltar: elegir un modo de
   herramienta hacía saltar al personaje. Hace falta soltar A y volver a apretarla, y mantenerla
   en el mundo tiene que seguir saltando.
+- **El teclado virtual con el manual.** Se abre sólo si el manual lo abrió el mando (no la H
+  del teclado físico) y en la página de búsqueda (no en la de un ítem), un tick después, porque
+  antes el manual todavía no se dibujó; se cierra con el manual sólo si lo abrimos nosotros, y
+  un teclado que el usuario reabrió a mano no se toca. Y el flag `ignoreNextKeyPress` que deja
+  colgado abrir el manual o el chat desde el mando, que se comía la primera letra: se apaga el
+  que se prendió durante el tick, y el que ya estaba de antes no.
+- **Los mapas de botones de PS4 contra SDL_GameControllerDB.** Hasta 1.15.0 el layout de
+  DirectInput (Windows) tenía L3, R3 y PS corridos, copiados del orden de Linux: con un DualShock
+  4 el botón PS agachaba. Se comparan los dos mapas con las líneas de SDL del DS4 v2.
 
 Sale con código ≠ 0 si algo falla. Corre en la laptop, sin el juego instalado.
 

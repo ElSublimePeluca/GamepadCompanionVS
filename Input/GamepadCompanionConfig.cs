@@ -23,6 +23,14 @@ public sealed class GamepadCompanionConfig
     // clicks del cursor virtual por igual.
     public bool  SwapTriggers     { get; set; } = false;
 
+    // Abrir el teclado virtual solo cuando el mando abre el manual en la página
+    // de búsqueda (ver Input/HandbookKeyboard.cs). Encendido por default: el
+    // manual mismo pone el foco en el buscador al abrirse, o sea que el juego
+    // ya asume que se abre para escribir. Quien lo abre para recorrer las
+    // categorías lo cierra con B, y si le molesta, lo apaga en la tab
+    // Sensibilidad.
+    public bool  KeyboardWithHandbook { get; set; } = true;
+
     // Device fijado a mano con .gpdevice: substring del nombre que reporta
     // GLFW (case-insensitive). null = autodetección. Sirve cuando hay más de
     // un joystick enchufado y el mod elige el que no es — típicamente algún

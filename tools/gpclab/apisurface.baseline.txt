@@ -1,4 +1,5 @@
-# gpclab apicheck — superficie de API del engine de la que dependen los glifos y el cursor.
+# gpclab apicheck — superficie de API del engine de la que dependen los glifos, el cursor y
+# el teclado virtual.
 # Generado con `dotnet run --project tools/gpclab -- apicheck --update`. No editar a mano.
 # Tomado contra VintagestoryAPI 1.22.7.0 / VintagestoryLib 1.22.7.0.
 # La versión del juego NO va en las líneas comparadas a propósito: un update que no
@@ -33,11 +34,14 @@ Vintagestory.API.Client.ElementBounds :: PROP   Double absX { public get; }
 Vintagestory.API.Client.ElementBounds :: PROP   Double absY { public get; }
 Vintagestory.API.Client.GuiComposer :: FIELD  internal Dictionary<String,GuiElement> interactiveElements
 Vintagestory.API.Client.GuiComposer :: FIELD  public Boolean Enabled
+Vintagestory.API.Client.GuiComposer :: METHOD public GuiElement GetElement(String key)  [decl:GuiComposer]
+Vintagestory.API.Client.GuiDialog :: FIELD  public Boolean ignoreNextKeyPress
 Vintagestory.API.Client.GuiDialog :: FIELD  public DlgComposers Composers
 Vintagestory.API.Client.GuiDialog :: METHOD public virtual Boolean IsOpened()  [decl:GuiDialog]
 Vintagestory.API.Client.GuiDialog :: METHOD public virtual Boolean IsOpened(String dialogComposerName)  [decl:GuiDialog]
 Vintagestory.API.Client.GuiDialog :: METHOD public virtual Boolean ShouldReceiveMouseEvents()  [decl:GuiDialog]
 Vintagestory.API.Client.GuiDialog :: PROP   EnumDialogType DialogType { public get; }
+Vintagestory.API.Client.GuiDialog :: PROP   GuiComposer SingleComposer { public get; public set; }
 Vintagestory.API.Client.GuiDialog+DlgComposers :: PROP   IEnumerable<GuiComposer> Values { public get; }
 Vintagestory.API.Client.GuiElement :: FIELD  public ElementBounds Bounds
 Vintagestory.API.Client.GuiElement :: METHOD public static Double scaled(Double value)  [decl:GuiElement]
@@ -112,3 +116,5 @@ Vintagestory.Client.NoObf.DrawWorldInteractionUtil :: METHOD public Void drawHel
 Vintagestory.Client.NoObf.GuiComposerManager :: METHOD public Void MarkAllDialogsForRecompose()  [decl:GuiComposerManager]
 Vintagestory.Client.NoObf.GuiComposerManager :: METHOD public Void RecomposeAllDialogs()  [decl:GuiComposerManager]
 Vintagestory.Client.ScreenManager :: FIELD  public static ClientPlatformAbstract Platform
+Vintagestory.GameContent.GuiDialogHandbook :: METHOD public Void initOverviewGui()  [decl:GuiDialogHandbook]
+Vintagestory.GameContent.GuiDialogHandbook :: METHOD public virtual Void OnRenderGUI(Single deltaTime)  [decl:GuiDialogHandbook]

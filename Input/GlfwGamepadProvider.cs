@@ -16,13 +16,18 @@ namespace GamepadCompanion.Input;
 //                 axes: LX,LY,LT,RX,RY,RT (0..5)
 //                 buttons: A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3 (0..10)
 //   Ds4Amazon   — PS4-DInput "estándar Sony", visto en el control
-//                 "Wired Controller" (Amazon B0CZ3WKF58, Ubsvaky LBE-PS4).
+//                 "Wired Controller" (Amazon B0CZ3WKF58, Ubsvaky LBE-PS4) y
+//                 en el DualShock 4 de Sony en Windows ("Wireless
+//                 Controller", 054C:09CC). Es el orden del descriptor HID del
+//                 DS4, así que también cae acá un DS4 en Linux sin el driver
+//                 Sony del kernel (hid-generic).
 //                 Firma: a3 Y a4 ambos ≈ -1 al primer poll (los dos triggers
 //                 signed en posiciones 3/4 en reposo). Hay que pedir AMBOS,
 //                 no uno solo, porque WinXInput también reporta a4 signed
 //                 (LT) — chequeando los dos a la vez se evita el falso match.
 //                 axes: LX,LY,RX,LT,RT,RY (0..5)
-//                 face buttons: Square,Cross,Circle,Triangle (raw 0..3)
+//                 buttons: Square,Cross,Circle,Triangle,L1,R1,L2,R2,Share,
+//                 Options,L3,R3,PS,Touchpad (raw 0..13)
 //   SonyDs      — Familia DualShock/DualSense manejada por el driver Sony del
 //                 kernel (hid-sony / hid-playstation), y todo lo que se hace
 //                 pasar por uno: GameSir Cyclone 2 en modo PS4 por USB (donde
@@ -107,10 +112,24 @@ public sealed class GlfwGamepadProvider : IGamepadProvider
 
     // bit-index (orden GamepadButton) → raw button index. 11 entradas:
     // A,B,X,Y,LB,RB,Back,Start,Guide,L3,R3. -1 = botón ausente en este layout.
-    private static readonly int[] Ds4AmazonButtonMap = {
-        1,  2,  0,  3,  4,  5,  8,  9, 10, 11, 12,
+    //
+    // Los dos mapas de PS4 son internal para que gpclab los compare contra
+    // SDL_GameControllerDB, que es la referencia (y la que usa GLFW adentro).
+    //
+    // Ds4Amazon: el orden de los usages HID del DS4, que es como numeran los
+    // botones DirectInput en Windows y hid-generic en Linux: L3, R3 y PS en
+    // raw 10, 11 y 12 (SDL: `leftstick:b10, rightstick:b11, guide:b12` en las
+    // entradas de 054C:05C4 y 054C:09CC, y en 49 de los 78 mandos de Windows
+    // con estos mismos ejes; ninguno con Guide antes que los sticks). Hasta
+    // 1.15.0 este mapa traía Guide, L3 y R3 en 10, 11 y 12, copiados del orden
+    // de evdev del driver Sony de Linux (SonyDs, donde BTN_MODE va antes que
+    // los sticks): con un DS4 en Windows el botón PS agachaba (llegaba como R3,
+    // el toggle de Shift), R3 corría y L3 no hacía nada. Reportado por Discord
+    // con un DualShock 4 v2 (054C:09CC) en Windows.
+    internal static readonly int[] Ds4AmazonButtonMap = {
+        1,  2,  0,  3,  4,  5,  8,  9, 12, 10, 11,
     };
-    private static readonly int[] SonyDsButtonMap = {
+    internal static readonly int[] SonyDsButtonMap = {
         0,  1,  3,  2,  4,  5,  8,  9, 10, 11, 12,
     };
     // GLFW en Windows XInput omite la tecla Guide (XInput la reserva al
