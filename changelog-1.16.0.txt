@@ -1,0 +1,58 @@
+GamepadCompanion v1.16.0
+
+The virtual keyboard works over the handbook, and opens with it
+
+  Reported by pngwn: with the handbook open, picking Virtual Keyboard in the
+  wheel did nothing, and the keyboard only showed up after backing out of the
+  handbook.
+
+  In single player the handbook pauses the game, and the wheel ran your choice
+  through one of the game's timers, which do not tick while the game is
+  paused. Whatever you picked waited for the pause to end, which is when you
+  closed the handbook. Multiplayer never pauses, so it depended on the world.
+  With developer mode and extended debug info both on, the game went further
+  and crashed on purpose, since it treats timers set during a pause as a bug
+  worth reporting. Wheel actions now run on the next frame whether the game is
+  paused or not, so this covers every slot, not just the keyboard, and the
+  pause menu as well as the handbook.
+
+  pngwn also asked for the keyboard to come up by itself, since the handbook is
+  usually opened to search for something. It now does, when:
+
+  - you open the handbook with the controller (from the wheel or a button).
+    If you pressed H on your keyboard, you are going to type on that keyboard,
+    and a virtual one would only be in the way.
+  - and it opens on the search page. With an item under the cursor the
+    handbook goes straight to that item's page, where there is nothing to
+    type, and the keyboard stays closed.
+
+  B closes the keyboard as always, which frees the cursor to browse the
+  results. If the handbook is closed some other way (Escape, the mouse), the
+  keyboard that opened with it closes too, instead of staying on screen with
+  nothing to type into. If you would rather open it yourself, turn off
+  "Keyboard in handbook" in .gpconfig, Sensitivity tab.
+
+Fixes
+
+- The first letter typed after opening the handbook or the chat from the
+  controller was lost, on the virtual keyboard and on a physical one alike.
+  Both discard the next character when they open, meant for the key that
+  opened them (the H, the T) so it does not land in the text box. Opened from
+  the controller there is no such character, so the first one you typed was
+  thrown away instead. The mod now clears that leftover.
+
+- DualShock 4 on Windows: the PS button made you crouch, R3 made you sprint and
+  L3 did nothing. Reported by XxShyWolf on Discord, with a Sony DualShock 4 v2.
+  The layout used for PS4 controllers over DirectInput had L3, R3 and PS in the
+  order they come in on Linux, where PS goes before the stick clicks; on
+  Windows it goes after them. That was there since 1.1.0, and the same map
+  serves the PS4-style controllers detected with that layout. L3 and R3 now
+  sprint and crouch, and PS does nothing, like the Guide button on other
+  controllers. The face buttons, bumpers, triggers, sticks and D-pad were
+  already right.
+
+Credits
+
+  Thanks to pngwn, for the handbook report and for asking for the keyboard to
+  open with it, and to ☾ 𓃥 XxShyWolf, for reporting the DualShock 4 buttons on
+  Discord and trying the fix before it was released.
